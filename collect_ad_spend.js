@@ -110,25 +110,75 @@ async function fetchJd() {
   return res;
 }
 
-/* ---------------- 淘宝闪购：全站推广 + 斗金推广（需 nr.ele.me 登录态） ---------------- */
+/* ---------------- 淘宝闪购：推广数据页（全站推广 + 斗金推广）
+   路径：#/pc/promotionDataPc/ → 内容在 doujin-isv-manage iframe 里
+   只支持页内固定口径「过去7天」「过去30天」，自定义日期控件不接受程序化输入，
+   因此 mtd / p90 不写数（页面上会标注）。 ---------------- */
 async function fetchEleme() {
   let tab;
   try {
     const tabs = await (await fetch(CDP + '/json/list')).json();
-    tab = tabs.find(t => (t.url || '').indexOf('nr.ele.me') >= 0);
+    tab = tabs.find(t => t.type === 'page' && (t.url || '').indexOf('https://nr.ele.me/') === 0);
   } catch (e) { return null; }
   if (!tab) { console.log('  淘闪：未打开 nr.ele.me 标签页，跳过'); return null; }
-  const {ws, ev} = await attach(u => u.indexOf('nr.ele.me') >= 0);
-  // 登录态自检
-  const chk = await ev("(async function(){try{var r=await window.lib.mtop.request({api:'mtop.alsc.user.session.ele.check',v:'1.0',type:'GET',data:{}});" +
-    "return JSON.stringify(r); }catch(e){ return 'THROW '+JSON.stringify(e).slice(0,200); }})()");
-  ws.close();
-  if (!chk || chk.indexOf('"code"') < 0 || chk.indexOf('000502') >= 0) {
-    console.log('  淘闪：登录态失效（' + String(chk).slice(0, 80) + '），跳过');
-    return null;
+
+  const WebSocket = require('ws');
+  const ws = new WebSocket(tab.webSocketDebuggerUrl);
+  let nid = 0; const pending = {}; const ctxs = [];
+  ws.on('message', m => { const o = JSON.parse(m.toString());
+    if (o.id && pending[o.id]) { pending[o.id](o); delete pending[o.id]; return; }
+    if (o.method === 'Runtime.executionContextCreated') ctxs.push(o.params.context);
+  });
+  await new Promise(r => ws.on('open', r));
+  const send = (m, p) => new Promise(res => { const i = ++nid; pending[i] = res; ws.send(JSON.stringify({id: i, method: m, params: p || {}})); });
+  const evIn = async (e, c) => {
+    const r = await send('Runtime.evaluate', {expression: e, returnByValue: true, awaitPromise: true, contextId: c});
+    if (r.result && r.result.exceptionDetails) return null;
+    return r.result && r.result.result ? r.result.result.value : null;
+  };
+  await send('Runtime.enable'); await send('Page.enable');
+  await send('Page.navigate', {url: 'https://nr.ele.me/app/eleme-nr-bfe-newretail/common-next#/pc/promotionDataPc/'});
+
+  // 等 iframe 上下文就绪
+  let cid = null;
+  for (let i = 0; i < 30; i++) {
+    await new Promise(r => setTimeout(r, 2000));
+    const dc = ctxs.filter(c => /doujin-isv-manage/.test(c.origin || ''));
+    if (dc.length) {
+      const c = dc[dc.length - 1].id;
+      const len = await evIn('document.body.innerText.length', c);
+      if (typeof len === 'number' && len > 300) { cid = c; break; }
+    }
   }
-  console.log('  淘闪：登录态正常，但推广页接口尚未接入 → 待补');
-  return null;
+  if (!cid) { ws.close(); console.log('  淘闪：内容未加载（可能登录态失效），跳过'); return null; }
+
+  const summary = () => evIn(`(function(){var t=document.body.innerText.replace(/\\s+/g,' ');
+    var m1=t.match(/已选时间[:：]?\\s*([\\d-]+)\\s*-\\s*([\\d-]+)/);
+    var m2=t.match(/推广消费\\(元\\)\\s*([\\d,\\.]+)/);
+    var m3=t.match(/全站交易额\\(元\\)\\s*([\\d,\\.]+)/);
+    return JSON.stringify({from:m1?m1[1]:null,to:m1?m1[2]:null,spend:m2?m2[1]:null,trade:m3?m3[1]:null});})()`, cid);
+  const clickTab = t => evIn(`(function(){var n=document.querySelectorAll('*');
+    for(var i=0;i<n.length;i++){ if((n[i].innerText||'').trim()==='${t}'&&n[i].children.length===0){
+      var el=n[i],k=0; while(el&&k<3){ el.click(); el=el.parentElement; k++; } return 'ok'; } } return 'nf';})()`, cid);
+
+  const out = {};
+  for (const [tabName, key] of [['过去7天', 'p7'], ['过去30天', 'p30']]) {
+    await clickTab(tabName);
+    await new Promise(r => setTimeout(r, 6000));
+    const s = await summary();
+    try {
+      const j = JSON.parse(s);
+      const spend = parseFloat(String(j.spend).replace(/,/g, ''));
+      const trade = parseFloat(String(j.trade).replace(/,/g, ''));
+      if (isFinite(spend) && isFinite(trade)) {
+        out[key] = {spend: r2(spend), trade: r2(trade), rate: trade ? r2(spend / trade * 100) : null,
+          src: '淘闪 全站推广+斗金推广', range: {from: j.from, to: j.to}};
+        console.log('  淘闪 ' + tabName + ' ' + (j.from || '') + '~' + (j.to || '') + ' 消费 ' + spend + ' 交易额 ' + trade);
+      }
+    } catch (e) {}
+  }
+  ws.close();
+  return Object.keys(out).length ? out : null;
 }
 
 /* ---------------- 主流程 ---------------- */
@@ -158,7 +208,9 @@ async function fetchEleme() {
     if (tb && tb[k]) out.periods[k].platforms['淘宝闪购'] = tb[k];
   }
   out.meta.plat_from = {美团: mt.since};
-  out.meta.missing = tb ? [] : ['淘宝闪购（全站推广+斗金推广）需 nr.ele.me 登录后补采'];
+  out.meta.eleme_periods = tb ? Object.keys(tb) : [];
+  out.meta.missing = tb ? (out.meta.eleme_periods.length < 4 ? ['淘宝闪购仅覆盖近7天/近30天（推广数据页只提供固定口径）'] : [])
+    : ['淘宝闪购（全站推广+斗金推广）需 nr.ele.me 登录后补采'];
 
   fs.writeFileSync(OUT, JSON.stringify(out, null, 1));
   console.log('\n已写入 ' + OUT);
