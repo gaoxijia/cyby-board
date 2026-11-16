@@ -199,7 +199,7 @@ body.locked > .wrap{display:none}
       <div id="trendChart"></div>
     </div>
     <div class="section">
-      <div class="section-head"><h2>渠道结构 <span class="tip">按销售额 + 订单 · 全区口径</span></h2></div>
+      <div class="section-head"><h2>渠道结构 <span class="tip">销售额 + 订单为 ERP 全区口径；推广费 / 广告成交 / 费率比 为各平台广告后台口径（费率比 = 推广费 ÷ 广告成交额）</span></h2></div>
       <div id="channelChart"></div>
       <h2 style="margin-top:14px">主体概览</h2>
       <div id="partnerCards"></div>
@@ -445,6 +445,7 @@ const M = D.meta, PS = D.periods, SD = D.stores, SK = D.skus;
 const $ = s => document.querySelector(s), $$ = s => document.querySelectorAll(s);
 const fmt = n => n==null||isNaN(n) ? "—" : Number(n).toLocaleString("zh-CN",{maximumFractionDigits:0});
 const money = n => n==null||isNaN(n) ? "—" : "¥"+Number(n).toLocaleString("zh-CN",{maximumFractionDigits:0});
+const money2 = n => n==null||isNaN(n) ? "—" : "¥"+Number(n).toLocaleString("zh-CN",{minimumFractionDigits:2,maximumFractionDigits:2});
 const pct = (a,b) => b ? (a/b*100) : 0;
 let P = "p30", curTab = "overview";
 let CP = null;                                   // 自定义区间的聚合结果（null = 用预设时间段）
@@ -739,14 +740,42 @@ function renderChannel(){
   chans = chans.filter(c => c.gmv > 0 || c.ord > 0).sort((a,b)=>b.gmv-a.gmv);
   const total = chans.reduce((s,c)=>s+c.gmv,0)||1;
   const totalOrd = chans.reduce((s,c)=>s+(c.ord||0),0);
+  // 推广费：各平台广告后台口径，自定义区间无对应数据 → 仅预设周期展示
+  const AD = (!CP && D.ad && D.ad.periods) ? (D.ad.periods[P] || null) : null;
+  const adP = (AD && AD.platforms) || {};
+  const adCol = r => r==null ? "var(--muted)" : (r>=40?"var(--red)":(r>=25?"var(--orange)":"var(--green)"));
   $("#channelChart").innerHTML = chans.length ? chans.map(c=>{
     const pc = c.gmv/total*100;
     const aov = c.ord ? money(c.gmv/c.ord) : "—";
     const ordTxt = c.ord==null ? "" : `${fmt(c.ord)} 单 · 客单 ${aov}`;
+    const a = adP[c.ch];
+    const adLine = a
+      ? `<div style="display:flex;justify-content:space-between;font-size:11.5px;margin-top:2px">
+           <span class="muted">推广费 <b class="num" style="color:var(--text)">${money2(a.spend)}</b> · 广告成交 <b class="num" style="color:var(--text)">${money2(a.trade)}</b></span>
+           <span class="muted">费率比 <b class="num" style="color:${adCol(a.rate)}">${a.rate==null?"—":a.rate.toFixed(1)+"%"}</b></span></div>`
+      : `<div class="muted" style="font-size:11.5px;margin-top:2px">推广费 —${AD?"（该渠道未接入广告后台）":"（切换至预设周期查看）"}</div>`;
     return `<div style="margin-bottom:9px">
       <div style="display:flex;justify-content:space-between;font-size:12.5px"><span>${c.ch} <span class="muted">${ordTxt}</span></span><b class="num">${money(c.gmv)} · ${pc.toFixed(1)}%</b></div>
-      <div class="bar-wrap" style="height:16px;margin-top:3px"><div class="bar" style="width:${pc}%;background:${colors[c.ch]||"#888"}"></div></div></div>`;
-  }).join("") + `<div class="muted" style="font-size:11.5px;margin-top:2px">合计 <b>${fmt(totalOrd)}</b> 单 · 客单 <b>${totalOrd?money(total/totalOrd):"—"}</b></div>`
+      <div class="bar-wrap" style="height:16px;margin-top:3px"><div class="bar" style="width:${pc}%;background:${colors[c.ch]||"#888"}"></div></div>
+      ${adLine}</div>`;
+  }).join("") + (function(){
+    const rows = Object.entries(adP);
+    const spend = rows.reduce((s,x)=>s+(x[1].spend||0),0);
+    const trade = rows.reduce((s,x)=>s+(x[1].trade||0),0);
+    const rate = trade ? spend/trade*100 : null;
+    const when = (D.ad && D.ad.generated_at) ? D.ad.generated_at.slice(5,16).replace("T"," ") : "";
+    let foot = `<div class="muted" style="font-size:11.5px;margin-top:2px">合计 <b>${fmt(totalOrd)}</b> 单 · 客单 <b>${totalOrd?money(total/totalOrd):"—"}</b>`;
+    if (rate != null) foot += `<span style="margin-left:10px">推广费合计 <b class="num" style="color:var(--text)">${money2(spend)}</b> · 广告成交 <b class="num" style="color:var(--text)">${money2(trade)}</b> · 综合费率 <b class="num" style="color:${adCol(rate)}">${rate.toFixed(1)}%</b></span>`;
+    if (when) {
+      // 采集时间超过 1 天 → 标注偏旧
+      const gen = (D.ad.generated_at || "").slice(0,10), today = (M.gen || "").slice(0,10);
+      const stale = gen && today && (new Date(today) - new Date(gen)) > 86400000;
+      foot += `<span style="margin-left:8px">· 推广数据 <span style="color:${stale?"var(--orange)":"inherit"}">${when}${stale?"（偏旧）":""}</span></span>`;
+    }
+    const mtFrom = (D.ad && D.ad.meta && D.ad.meta.plat_from) ? D.ad.meta.plat_from["美团"] : "";
+    if (AD && mtFrom && AD.range && AD.range.from < mtFrom) foot += `<span style="margin-left:8px">· 美团广告自 ${mtFrom.slice(5)} 起有数据</span>`;
+    return foot + `</div>`;
+  })()
     : '<div class="empty">无渠道数据</div>';
 
   const pdata = p.charts && p.charts.partner || [];

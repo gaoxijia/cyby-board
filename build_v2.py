@@ -166,6 +166,12 @@ sch_path = os.path.join(OUT, "erp_store_channel.json")
 if os.path.exists(sch_path):
     payload["storeCh"] = json.load(open(sch_path, encoding="utf-8")).get("periods") or {}
 
+# 推广费 / 费率比（三平台广告后台，本地浏览器采集后入库；云端只读不采）
+# 美团、淘闪接口有登录态+风控限制，无法在 GitHub 云端调用；京东可云端刷新后覆盖
+ad_path = os.path.join(OUT, "ad_spend.json")
+if os.path.exists(ad_path):
+    payload["ad"] = json.load(open(ad_path, encoding="utf-8"))
+
 html = open(os.path.join(OUT, "template_v2.html"), encoding="utf-8").read()
 blob = "const D = " + json.dumps(payload, ensure_ascii=False, separators=(",", ":")) + \
        ";\nwindow.D = D;"
@@ -192,3 +198,8 @@ if "catpf" in payload:
     print(f"   品类×平台 {cf['from']} ~ {cf['to']} · " +
           " | ".join(f"{k} {v['qty']}件" for k, v in cf["plats"].items() if v["qty"]) +
           f" · 剔除赠品/打包袋 {cf['excluded']['qty']}件")
+if "ad" in payload:
+    ad = payload["ad"]
+    print(f"   推广费 {str(ad.get('generated_at'))[:16]} · " +
+          " | ".join(f"{k} " + ",".join(f"{pl} ¥{v['spend']:,.0f}/{v.get('rate')}%" for pl, v in p["platforms"].items())
+                     for k, p in ad["periods"].items()))
