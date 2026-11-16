@@ -171,7 +171,7 @@ async function fetchEleme() {
       const spend = parseFloat(String(j.spend).replace(/,/g, ''));
       const trade = parseFloat(String(j.trade).replace(/,/g, ''));
       if (isFinite(spend) && isFinite(trade)) {
-        out[key] = {spend: r2(spend), trade: r2(trade), rate: trade ? r2(spend / trade * 100) : null,
+        out[key] = {spend: r2(spend), trade: r2(trade), rateAd: trade ? r2(spend / trade * 100) : null,
           src: '淘闪 全站推广+斗金推广', range: {from: j.from, to: j.to}};
         console.log('  淘闪 ' + tabName + ' ' + (j.from || '') + '~' + (j.to || '') + ' 消费 ' + spend + ' 交易额 ' + trade);
       }
@@ -200,11 +200,11 @@ async function fetchEleme() {
     const m = mt.agg(f, t);
     if (m.spend > 0 || m.trade > 0) {
       out.periods[k].platforms['美团'] = {spend: m.spend, trade: m.trade,
-        rate: m.trade ? r2(m.spend / m.trade * 100) : null, src: 'ka.waimai 联合营销'};
+        rateAd: m.trade ? r2(m.spend / m.trade * 100) : null, src: 'ka.waimai 联合营销'};
     }
     const j = jd[k];
     if (j) out.periods[k].platforms['京东'] = {spend: j.spend, trade: j.trade,
-      rate: j.trade ? r2(j.spend / j.trade * 100) : null, src: 'jzt 竞价广告'};
+      rateAd: j.trade ? r2(j.spend / j.trade * 100) : null, src: 'jzt 竞价广告'};
     if (tb && tb[k]) out.periods[k].platforms['淘宝闪购'] = tb[k];
   }
   out.meta.plat_from = {美团: mt.since};
@@ -216,6 +216,6 @@ async function fetchEleme() {
   console.log('\n已写入 ' + OUT);
   for (const k of Object.keys(PERIODS)) {
     const p = out.periods[k].platforms;
-    console.log('  ' + k + ': ' + Object.keys(p).map(k2 => k2 + ' ¥' + p[k2].spend + ' / ' + p[k2].rate + '%').join('  '));
+    console.log('  ' + k + ': ' + Object.keys(p).map(k2 => k2 + ' ¥' + p[k2].spend).join('  '));
   }
 })().catch(e => { console.error('失败：' + e.message); process.exit(1); });
