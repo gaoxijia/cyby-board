@@ -1,0 +1,46 @@
+name: board-refresh
+on:
+  schedule:
+    # GitHub Actions cron 用 UTC；北京时间 07:30 = UTC 23:30（前一天）
+    - cron: '30 23 * * *'
+  workflow_dispatch: {}   # 允许手动触发
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build-deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: 写入凭据（secrets.json 不入库）
+        env:
+          BOARD_SECRETS: ${{ secrets.BOARD_SECRETS_JSON }}
+        run: |
+          if [ -z "$BOARD_SECRETS" ]; then
+            echo "缺少 Secret BOARD_SECRETS_JSON"; exit 1
+          fi
+          printf '%s' "$BOARD_SECRETS" > secrets.json
+
+      - name: 采集并建板（约 6-10 分钟）
+        run: python3 run_all.py
+
+      - name: 上传 Pages 产物
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+      - name: 部署 Pages
+        uses: actions/deploy-pages@v4
