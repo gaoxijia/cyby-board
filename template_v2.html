@@ -1,0 +1,1576 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>出其不意经营看板 · 动销 / 库存周转 / 补货决策</title>
+<style>
+:root{
+  --bg:#f6f4f0; --card:#ffffff; --line:#e8e2d8; --text:#2b2620; --muted:#8a8272;
+  --brand:#a4451f; --brand-soft:#f4e8de;
+  --red:#c0392b; --red-bg:#fdecea; --orange:#d97706; --orange-bg:#fef3e2;
+  --yellow:#b58900; --yellow-bg:#fdf6dd; --green:#1e7f4f; --green-bg:#e3f3ea;
+  --blue:#2f6fa7; --blue-bg:#e8f1f8; --gray:#6b7280; --gray-bg:#f1f0ee;
+  --radius:12px;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  font-size:14px;line-height:1.5}
+.wrap{max-width:1400px;margin:0 auto;padding:22px 26px 60px}
+h1{font-size:22px;margin:0 0 6px;letter-spacing:.5px}
+h2{font-size:14px;margin:0 0 10px;font-weight:600;color:var(--text)}
+.badge{display:inline-block;font-size:11.5px;font-weight:500;background:var(--green-bg);color:var(--green);
+  border-radius:20px;padding:2px 10px;margin-left:8px;vertical-align:middle}
+.muted{color:var(--muted)}
+.tip{font-size:11.5px;color:var(--muted);font-weight:400;margin-left:6px}
+header{margin-bottom:14px}
+.sub{font-size:12px;color:var(--muted)}
+/* 时间段 */
+.periods{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
+.periods .lab{font-size:12px;color:var(--muted);margin-right:2px}
+.chip{border:1px solid var(--line);background:#fff;color:var(--text);border-radius:20px;
+  padding:6px 14px;font-size:12.5px;cursor:pointer;transition:.15s}
+.chip:hover{border-color:var(--brand);color:var(--brand)}
+.chip.on{background:var(--brand-soft);border-color:var(--brand);color:var(--brand);font-weight:600}
+.chip.ghost{color:var(--muted);border-style:dashed}
+/* 筛选 */
+.filters{display:flex;flex-wrap:wrap;gap:10px;align-items:center;background:var(--card);
+  border:1px solid var(--line);border-radius:var(--radius);padding:11px 14px;margin-bottom:14px}
+.filters label{font-size:12.5px;color:var(--muted);display:flex;align-items:center;gap:6px}
+select,input[type=text],input[type=number]{font-family:inherit;font-size:12.5px;color:var(--text);
+  background:#fff;border:1px solid var(--line);border-radius:8px;padding:5px 8px;outline:none}
+input[type=date]{font-family:inherit;font-size:12.5px;color:var(--text);background:#fff;
+  border:1px solid var(--line);border-radius:8px;padding:4px 7px;outline:none;cursor:pointer}
+input[type=date]:focus{border-color:var(--brand)}
+select:focus,input:focus{border-color:var(--brand)}
+input[type=number]{width:62px}
+.btn{margin-left:auto;font-size:12px;color:var(--brand);background:none;border:none;cursor:pointer;padding:4px 2px}
+.btn:hover{text-decoration:underline}
+/* tabs */
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin-bottom:16px;flex-wrap:wrap}
+.tab{background:none;border:none;border-bottom:2px solid transparent;padding:10px 16px;font-size:13.5px;
+  color:var(--muted);cursor:pointer;font-family:inherit}
+.tab:hover{color:var(--text)}
+.tab.on{color:var(--brand);border-bottom-color:var(--brand);font-weight:600}
+.tab .n{font-size:11px;color:var(--muted);margin-left:3px}
+/* KPI */
+#kpis{display:grid;grid-template-columns:repeat(7,1fr);gap:10px;margin-bottom:14px}
+@media(max-width:1200px){#kpis{grid-template-columns:repeat(4,1fr)}}
+@media(max-width:760px){#kpis{grid-template-columns:repeat(2,1fr)}}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:11px 13px}
+.kpi .lab{font-size:11.5px;color:var(--muted);margin-bottom:5px}
+.kpi .val{font-size:20px;font-weight:600;letter-spacing:-.3px}
+.kpi .foot{font-size:11px;color:var(--muted);margin-top:3px;line-height:1.4}
+.kpi.red .val{color:var(--red)} .kpi.orange .val{color:var(--orange)} .kpi.green .val{color:var(--green)}
+.kpi.blue .val{color:var(--blue)}
+/* 绩效看板 */
+.kpirow{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
+@media(max-width:1100px){.kpirow{grid-template-columns:repeat(2,1fr)}}
+#perfTable{font-size:11.5px}
+#perfTable th,#perfTable td{white-space:nowrap;padding:7px 7px}
+#perfTable td:first-child{font-weight:600}
+#perfTable .goalbar{min-width:64px}
+td.ok{color:var(--green);font-weight:600} td.warn{color:var(--orange);font-weight:600} td.bad{color:var(--red);font-weight:600}
+.lvl{display:inline-block;font-size:11px;border-radius:20px;padding:2px 9px;white-space:nowrap}
+.lvl.g{background:var(--green-bg);color:var(--green)} .lvl.o{background:var(--orange-bg);color:var(--orange)}
+.lvl.r{background:var(--red-bg);color:var(--red)} .lvl.b{background:var(--blue-bg);color:var(--blue)}
+.goalbar{position:relative;height:9px;background:#eee8dd;border-radius:6px;overflow:hidden;margin-top:3px}
+.goalbar i{position:absolute;left:0;top:0;bottom:0;border-radius:6px}
+.goalbar b{position:absolute;top:-2px;bottom:-2px;width:2px;background:var(--text);opacity:.55}
+/* 卡片 */
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:1100px){.grid2{grid-template-columns:1fr}}
+.section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;margin-bottom:14px}
+.section-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
+.section-head h2{margin:0}
+.exp{font-size:12px;color:var(--brand);background:var(--brand-soft);border:1px solid transparent;
+  border-radius:8px;padding:4px 10px;cursor:pointer;font-family:inherit}
+.exp:hover{border-color:var(--brand)}
+/* 表格 */
+.tablewrap{overflow:auto;max-height:560px;border:1px solid var(--line);border-radius:10px}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+thead th{position:sticky;top:0;background:#faf8f4;text-align:left;font-weight:600;color:var(--muted);
+  padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap;z-index:2}
+tbody td{padding:7px 10px;border-bottom:1px solid #f4f0e9;vertical-align:middle}
+tbody tr:hover{background:#fbf9f5}
+tbody tr.dead{opacity:.72}
+.r{text-align:right} .num{font-variant-numeric:tabular-nums}
+.sku-name{max-width:340px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.upc{white-space:nowrap;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;color:var(--muted);letter-spacing:.2px}
+.skucode{white-space:nowrap;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;color:var(--text)}
+.pill{display:inline-block;padding:2px 9px;border-radius:12px;font-size:11.5px;white-space:nowrap}
+.pill.red{background:var(--red-bg);color:var(--red)} .pill.orange{background:var(--orange-bg);color:var(--orange)}
+.pill.yellow{background:var(--yellow-bg);color:var(--yellow)} .pill.green{background:var(--green-bg);color:var(--green)}
+.pill.blue{background:var(--blue-bg);color:var(--blue)} .pill.gray{background:var(--gray-bg);color:var(--gray)}
+.bar-wrap{background:#f0ece4;border-radius:6px;height:14px;min-width:70px;position:relative;overflow:hidden}
+.bar{height:100%;border-radius:6px}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:11.5px;color:var(--muted)}
+.legend i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px;vertical-align:middle}
+.hint{font-size:11.5px;color:var(--muted);margin-top:10px;line-height:1.75}
+.hint b{color:var(--text)}
+.empty{padding:26px;text-align:center;color:var(--muted);font-size:13px}
+footer{margin-top:18px;font-size:11.5px;color:var(--muted);line-height:1.8;border-top:1px solid var(--line);padding-top:12px}
+footer b{color:var(--text)}
+/* 登录门 */
+#loginGate{position:fixed;inset:0;z-index:999;background:var(--bg);display:none;align-items:center;justify-content:center}
+.lg-card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:36px 32px 30px;width:330px;box-shadow:0 12px 40px rgba(43,38,32,.10)}
+.lg-card h1{text-align:center;margin:0 0 4px;font-size:20px}
+.lg-sub{text-align:center;font-size:12px;color:var(--muted);margin-bottom:24px}
+.lg-card label{display:block;font-size:12px;color:var(--muted);margin:12px 0 4px}
+.lg-card input{width:100%;padding:9px 11px;font-size:14px;font-family:inherit;border:1px solid var(--line);border-radius:9px;outline:none;box-sizing:border-box}
+.lg-card input:focus{border-color:var(--brand)}
+.lg-btn{width:100%;margin-top:20px;background:var(--brand);color:#fff;border:none;border-radius:9px;padding:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;letter-spacing:4px}
+.lg-btn:hover{opacity:.88}
+.lg-err{color:var(--red);font-size:12px;margin-top:10px;text-align:center;min-height:17px}
+body.locked > .wrap{display:none}
+</style>
+</head>
+<body>
+<div id="loginGate">
+  <div class="lg-card">
+    <h1>出其不意经营看板</h1>
+    <div class="lg-sub">请登录后查看经营数据</div>
+    <label>账号</label>
+    <input id="lgUser" autocomplete="username" placeholder="请输入账号">
+    <label>密码</label>
+    <input id="lgPass" type="password" autocomplete="current-password" placeholder="请输入密码">
+    <div class="lg-err" id="lgErr"></div>
+    <button class="lg-btn" id="lgBtn">登 录</button>
+  </div>
+</div>
+<div class="wrap">
+<header>
+  <h1>出其不意经营看板<span class="badge" id="srcBadge">街顺 API · 实时库存</span></h1>
+  <div class="sub" id="subTitle"></div>
+</header>
+
+<div class="periods">
+  <span class="lab">时间段</span>
+  <button class="chip" data-p="p7">近7个完整日</button>
+  <button class="chip on" data-p="p30">近30个完整日</button>
+  <button class="chip" data-p="p90">近90个完整日</button>
+  <button class="chip" data-p="mtd">本月至昨日</button>
+  <button class="chip ghost" id="resPeriod">重置时间段</button>
+  <span style="width:10px"></span>
+  <span class="lab">自定义区间</span>
+  <input type="date" id="dFrom" title="起始日期">
+  <span class="muted" style="font-size:12px">至</span>
+  <input type="date" id="dTo" title="结束日期">
+  <button class="chip ghost" id="dApply">查询</button>
+  <button class="chip" id="chipCustom" style="display:none"></button>
+  <span class="tip" id="dHint"></span>
+</div>
+
+<div class="filters">
+  <label>主体 <select id="fPartner"><option value="">全部主体</option></select></label>
+  <label>城市 <select id="fCity"><option value="">全部城市</option></select></label>
+  <label>门店 <select id="fStore"><option value="">全部门店</option></select></label>
+  <label>补货目标 <input type="number" id="fTarget" value="14" min="3"> 天</label>
+  <label>压货阈值 <input type="number" id="fSlow" value="60" min="14"> 天</label>
+  <label>日均口径
+    <select id="fDag">
+      <option value="js">街顺日均销量</option>
+      <option value="d30">近30天销量÷30</option>
+    </select>
+  </label>
+  <button class="btn" id="clearBtn">重置筛选</button>
+</div>
+
+<div class="tabs">
+  <button class="tab on" data-tab="overview">经营总览</button>
+  <button class="tab" data-tab="movement">商品动销<span class="n" id="tabMov"></span></button>
+  <button class="tab" data-tab="turnover">库存周转</button>
+  <button class="tab" data-tab="restock">补货决策<span class="n" id="tabRst"></span></button>
+  <button class="tab" data-tab="category">品类分析</button>
+  <button class="tab" data-tab="perf">11月绩效</button>
+  <button class="tab" data-tab="cwhub">中心仓</button>
+</div>
+
+<div id="kpis"></div>
+<div class="hint" id="exclNote" style="margin-top:-4px"></div>
+
+<!-- 经营总览 -->
+<div id="tab-overview">
+  <div class="grid2">
+    <div class="section">
+      <div class="section-head"><h2>销售趋势 <span class="tip" id="trendTip"></span></h2></div>
+      <div class="legend"><span><i style="background:var(--brand)"></i>本期</span><span><i style="background:#c9bfb2"></i>上期</span></div>
+      <div id="trendChart"></div>
+    </div>
+    <div class="section">
+      <div class="section-head"><h2>渠道结构 <span class="tip">按销售额 + 订单 · 全区口径</span></h2></div>
+      <div id="channelChart"></div>
+      <h2 style="margin-top:14px">主体概览</h2>
+      <div id="partnerCards"></div>
+    </div>
+  </div>
+  <div class="section">
+    <div class="section-head">
+      <h2>门店经营榜 <span class="tip" id="storeTip">GMV/订单 按所选时间段与平台 · 库存/销量/周转为街顺全平台实时（已剔除赠品/包装袋）</span></h2>
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+        <span class="muted" style="font-size:12.5px">平台：</span>
+        <button class="chip on" data-sp="全部">全部</button>
+        <button class="chip" data-sp="美团">美团</button>
+        <button class="chip" data-sp="京东">京东</button>
+        <button class="chip" data-sp="淘宝闪购">淘闪</button>
+        <button class="exp" data-exp="store">导出当前筛选</button>
+      </div>
+    </div>
+    <div class="tablewrap" style="max-height:480px">
+      <table id="storeTable"><thead><tr>
+        <th>门店</th><th>主体</th><th>城市</th><th class="r" id="thGmv">GMV(元)</th><th class="r">订单</th>
+        <th class="r">库存(件)</th><th class="r">30天销量</th><th class="r">日均</th><th class="r">整体周转(天)</th><th>状态</th>
+      </tr></thead><tbody></tbody></table>
+    </div>
+  </div>
+</div>
+
+<!-- 商品动销 -->
+<div id="tab-movement" style="display:none">
+  <div class="section">
+    <div class="section-head"><h2>动销分布 <span class="tip">按近30天销量分级（街顺口径）</span></h2></div>
+    <div id="movDist"></div>
+  </div>
+  <div class="section">
+    <div class="section-head">
+      <h2>SKU 动销明细 <span class="tip">可售天数 = 库存 ÷ 街顺日均销量</span></h2>
+      <div style="display:flex;gap:8px">
+        <select id="movLevel"><option value="">全部等级</option><option value="A">A · 热销</option><option value="B">B · 常销</option><option value="C">C · 慢销</option><option value="D">D · 零动销</option></select>
+        <input type="text" id="movSearch" placeholder="搜索 SKU / 商品">
+        <button class="exp" data-exp="mov">导出当前筛选</button>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
+      <span class="muted" style="font-size:12.5px">平台：</span>
+      <button class="chip on" data-mp="全部">全部</button>
+      <button class="chip" data-mp="美团">美团</button>
+      <button class="chip" data-mp="淘宝">淘宝</button>
+      <button class="chip" data-mp="京东">京东</button>
+      <span class="muted" style="font-size:12px" id="movRange"></span>
+    </div>
+    <div class="tablewrap">
+      <table id="movTable"><thead><tr id="movThead"></tr></thead><tbody></tbody></table>
+    </div>
+    <div class="hint" id="movFoot"></div>
+  </div>
+</div>
+
+<!-- 库存周转 -->
+<div id="tab-turnover" style="display:none">
+  <div class="grid2">
+    <div class="section">
+      <div class="section-head"><h2>库存可售天数分布 <span class="tip">按店-SKU 库存件数</span></h2></div>
+      <div id="bucketChart"></div>
+    </div>
+    <div class="section">
+      <div class="section-head"><h2>周转口径说明</h2></div>
+      <div class="hint" style="margin-top:0">
+        <b>周转天数 = 当前库存 ÷ 日均销量</b>（分子用全部库存，不再扣死库存）<br><br>
+        <b>分母有两种口径，顶部「日均口径」可切换：</b><br>
+        · <b>街顺日均销量</b>（默认）= 街顺 SKU 的 day_avg_sale 字段，实测接近「近7天销量÷7」，带平滑，和街顺后台显示一致；<br>
+        · <b>近30天销量÷30</b> = 严格按近30天平均，长尾/断货 SKU 数字会明显偏大。<br><br>
+        举例（南宁西乡塘店）：库存 851 件，30天卖 11 件，街顺日均 1.4 → 按街顺日均 <b>608 天</b>；按 30天÷30 → 2321 天。旧版是「(库存−死库存)÷(30天销量÷30)=1426 天」，把零动销库存从分子里剔掉了，口径不透明，已废弃。<br><br>
+        <b>数据来源：</b>库存、近7/14/30天销量、日均 = 街顺 API 实时快照（<span id="jsTime"></span>）；近3天销量、GMV、订单 = 星火 ERP 实际数据。<br><br>
+        <b>剔除口径：</b>赠品、打包袋/包装袋（名称含「赠」「打包袋」「包装袋」等）<b>不计入库存件数、库存金额、周转与补货</b>，避免几十件当几百元商品拉高周转天数。
+      </div>
+    </div>
+  </div>
+  <div class="section">
+    <div class="section-head">
+      <h2>门店库存周转榜 <span class="tip">整体周转 = 门店库存 ÷ 门店日均销量</span></h2>
+      <button class="exp" data-exp="turn">导出当前筛选</button>
+    </div>
+    <div class="tablewrap">
+      <table id="turnTable"><thead><tr>
+        <th>门店</th><th>主体</th><th>城市</th><th class="r">库存(件)</th><th class="r">库存金额(元)</th>
+        <th class="r">近30天销量</th><th class="r">日均</th><th class="r">整体周转(天)</th><th style="width:130px">周转水位</th><th>状态</th>
+      </tr></thead><tbody></tbody></table>
+    </div>
+  </div>
+</div>
+
+<!-- 补货决策 -->
+<div id="tab-restock" style="display:none">
+  <div id="rstKpis"></div>
+  <div class="section">
+    <div class="section-head">
+      <h2>补货清单</h2>
+      <div style="display:flex;gap:8px">
+        <select id="rstLevel">
+          <option value="need">需补货（售罄+紧急+预警）</option>
+          <option value="urgent">只看售罄/紧急</option>
+          <option value="over">只看压货</option>
+          <option value="dead">只看死库存</option>
+          <option value="">全部</option>
+        </select>
+        <input type="text" id="rstSearch" placeholder="搜索门店 / SKU">
+        <button class="exp" data-exp="rst">导出当前筛选</button>
+      </div>
+    </div>
+    <div class="tablewrap">
+      <table id="rstTable"><thead><tr>
+        <th>门店</th><th>UPC</th><th>SKU ID</th><th>SKU / 商品</th><th class="r">近3天</th><th class="r">近7天</th><th class="r">近14天</th>
+        <th class="r">30天销量</th><th class="r">日均</th><th class="r">库存</th><th class="r">可售天数</th>
+        <th>状态</th><th class="r">建议补货</th><th>建议动作</th>
+      </tr></thead><tbody></tbody></table>
+    </div>
+    <div class="hint" id="rstFoot"></div>
+    <div class="hint">
+      <b>判定口径（街顺）：</b>
+      ① <b>售罄</b>=30天有销量但库存为0；② <b>紧急</b>=可售&lt;7天；③ <b>预警</b>=可售&lt;目标天数；
+      ④ <b>压货</b>=可售&gt;压货阈值；⑤ <b>死库存</b>=30天零销量且有库存。<br>
+      <b>短周期销量：</b>近7/14天取街顺 7/14 天销量字段，近3天取星火 ERP 实际出库（街顺无3天字段）。近7天×4 明显低于30天销量说明走弱、可暂缓补货；反之在起量、优先补。
+    </div>
+  </div>
+</div>
+
+<!-- 品类分析 -->
+<div id="tab-category" style="display:none">
+  <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
+    <span class="muted" style="font-size:12.5px">平台：</span>
+    <button class="chip on" data-cp="全部">全部</button>
+    <button class="chip" data-cp="美团">美团</button>
+    <button class="chip" data-cp="淘宝">淘宝</button>
+    <button class="chip" data-cp="京东">京东</button>
+    <span class="muted" style="font-size:12px" id="catRange"></span>
+  </div>
+  <div class="grid2">
+    <div class="section">
+      <div class="section-head"><h2>品类销量占比 <span class="tip" id="catTip">近30天 · 街顺口径</span></h2></div>
+      <div id="catBars"></div>
+    </div>
+    <div class="section">
+      <div class="section-head">
+        <h2>品类明细</h2>
+        <button class="exp" data-exp="cat">导出当前筛选</button>
+      </div>
+      <div class="tablewrap" style="max-height:430px">
+        <table id="catTable"><thead><tr id="catThead"></tr></thead><tbody></tbody></table>
+      </div>
+    </div>
+  </div>
+  <div class="hint" id="catFoot"></div>
+</div>
+
+<!-- 11月绩效 -->
+<div id="tab-perf" style="display:none">
+  <div class="kpirow" id="perfCards"></div>
+  <div class="section">
+    <div class="section-head">
+      <h2>平台绩效达成 <span class="tip" id="perfRange"></span></h2>
+      <button class="exp" data-exp="perf">导出当前筛选</button>
+    </div>
+    <div class="tablewrap" style="max-height:none">
+      <table id="perfTable"><thead><tr>
+        <th>平台</th><th class="r">日均订单</th><th class="r">月订单目标</th>
+        <th class="r">日均交易额</th><th class="r">月交易额目标</th>
+        <th class="r">11月订单数</th><th class="r">11月交易额</th>
+        <th class="r">订单进度</th><th class="r">交易额进度</th><th class="r">时间进度</th>
+        <th class="r">应达</th><th class="r">差距</th>
+        <th class="r">预计月底订单</th><th class="r">预计月底交易额</th>
+        <th class="r">剩余日均需</th><th>状态</th>
+      </tr></thead><tbody></tbody></table>
+    </div>
+    <div class="hint" id="perfFoot" style="margin-top:10px"></div>
+  </div>
+  <div class="grid2">
+    <div class="section">
+      <div class="section-head"><h2>每日订单 <span class="tip">堆叠柱=各平台实际 · 虚线=日目标</span></h2></div>
+      <div id="perfDailyChart"></div>
+    </div>
+    <div class="section">
+      <div class="section-head"><h2>累计完成 vs 目标 <span class="tip">虚线=按时间进度应达</span></h2></div>
+      <div id="perfCumChart"></div>
+    </div>
+  </div>
+  <div class="section">
+    <div class="section-head"><h2>每日明细 <span class="tip">街顺平台口径 · 有效订单 / 交易额（元）</span></h2></div>
+    <div class="tablewrap" style="max-height:420px">
+      <table id="perfDayTable"><thead><tr>
+        <th>日期</th><th class="r">淘宝闪购单</th><th class="r">淘宝交易额</th>
+        <th class="r">京东秒杀单</th><th class="r">京东交易额</th>
+        <th class="r">美团闪购单</th><th class="r">美团交易额</th>
+        <th class="r">合计单</th><th class="r">合计交易额</th><th class="r">当日达成</th>
+      </tr></thead><tbody></tbody></table>
+    </div>
+  </div>
+</div>
+
+<!-- 中心仓 -->
+<div id="tab-cwhub" style="display:none">
+  <div class="hint" style="margin:0 0 14px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 14px">
+    <b>S/A/B 分级规则</b>（按省内大盘近 30 天销量占比）：<span class="pill green">S 级</span> 贡献省内销量前 50% 的商品 ·
+    <span class="pill blue">A 级</span> 贡献前 50%~70% 的商品 · <span class="pill gray">B 级</span> 尾部 30%（含零动销）。&nbsp;
+    <b>中心仓定位：</b>存储 S/A 级货，服务于省内各门店的<b>紧急补货</b>；B 级货调拨回中心仓做<b>退仓 / 调拨处理</b>。&nbsp;
+    <b>建仓状态：</b>云南、广西中心仓尚在筹建，本页以商品销量数据给出「入仓摆放 / 调拨退仓」建议，供建仓选品决策。
+  </div>
+  <div class="grid2" id="cwCards" style="margin-bottom:14px"></div>
+  <div class="section">
+    <div class="section-head">
+      <h2>商品 S/A/B 分级明细 <span class="tip" id="cwTip"></span></h2>
+      <button class="exp" data-exp="cw">导出当前筛选</button>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
+      <select id="cwProv" style="padding:6px 10px;border:1px solid var(--line);border-radius:8px;font-size:12.5px">
+        <option value="">全部省份</option><option>云南</option><option>广西</option>
+      </select>
+      <select id="cwGrade" style="padding:6px 10px;border:1px solid var(--line);border-radius:8px;font-size:12.5px">
+        <option value="">全部等级</option><option value="S">S 级</option><option value="A">A 级</option><option value="B">B 级</option>
+      </select>
+      <input id="cwSearch" type="text" placeholder="商品名 / SKU / 条码"
+             style="padding:6px 10px;border:1px solid var(--line);border-radius:8px;font-size:12.5px;width:200px">
+      <label style="font-size:12.5px;color:var(--muted);display:flex;align-items:center;gap:5px">
+        <input type="checkbox" id="cwInStock"> 仅有库存
+      </label>
+    </div>
+    <div class="tablewrap">
+      <table id="cwTable"><thead><tr>
+        <th>#</th><th>省份</th><th>等级</th><th>SKU 编码</th><th>商品全名</th><th>规格名称</th><th>分类</th>
+        <th class="r">省内30天销量</th><th class="r">销量占比</th><th class="r">累计占比</th>
+        <th class="r">覆盖门店</th><th class="r">省内在仓</th><th class="r">日均</th><th>中心仓建议</th>
+      </tr></thead><tbody></tbody></table>
+    </div>
+    <div class="hint" id="cwFoot" style="margin-top:10px"></div>
+  </div>
+</div>
+
+<footer id="footNote"></footer>
+</div>
+
+<script>
+/*__PAYLOAD__*/
+
+const M = D.meta, PS = D.periods, SD = D.stores, SK = D.skus;
+const $ = s => document.querySelector(s), $$ = s => document.querySelectorAll(s);
+const fmt = n => n==null||isNaN(n) ? "—" : Number(n).toLocaleString("zh-CN",{maximumFractionDigits:0});
+const money = n => n==null||isNaN(n) ? "—" : "¥"+Number(n).toLocaleString("zh-CN",{maximumFractionDigits:0});
+const pct = (a,b) => b ? (a/b*100) : 0;
+let P = "p30", curTab = "overview";
+let CP = null;                                   // 自定义区间的聚合结果（null = 用预设时间段）
+const F = {partner:"", city:"", store:"", target:14, slow:60, dag:"js"};
+
+/** 当前生效的时间段对象（预设 或 自定义） */
+function curP(){ return CP || PS[P]; }
+
+/** 日均口径：js = 街顺日均字段；d30 = 近30天销量÷30 */
+function dailyOf(r){ return F.dag === "js" ? (r.dag||0) : (r.s30||0)/30; }
+function coverOf(r){ const d = dailyOf(r); return d>0 ? (r.stock||0)/d : null; }
+function storeDaily(g){ return F.dag === "js" ? (g.dag||0) : (g.s30||0)/30; }
+
+/* ---------- 筛选 ---------- */
+function storeList(){
+  return M.stores.filter(s =>
+    (!F.partner || s.vendor === F.partner) &&
+    (!F.city || s.city === F.city) &&
+    (!F.store || s.id === F.store));
+}
+function initFilters(){
+  const ps = [...new Set(M.stores.map(s=>s.vendor))];
+  $("#fPartner").innerHTML = '<option value="">全部主体</option>' + ps.map(v=>`<option>${v}</option>`).join("");
+  $("#fCity").innerHTML = '<option value="">全部城市</option>' + M.cities.map(c=>`<option>${c}</option>`).join("");
+  syncStores();
+  $("#fPartner").onchange = e => { F.partner = e.target.value; syncStores(); renderAll(); };
+  $("#fCity").onchange = e => { F.city = e.target.value; syncStores(); renderAll(); };
+  $("#fStore").onchange = e => { F.store = e.target.value; renderAll(); };
+  $("#fTarget").onchange = e => { F.target = Math.max(3, +e.target.value || 14); renderAll(); };
+  $("#fSlow").onchange = e => { F.slow = Math.max(14, +e.target.value || 60); renderAll(); };
+  $("#fDag").onchange = e => { F.dag = e.target.value; renderAll(); };
+  $("#clearBtn").onclick = () => {
+    F.partner = F.city = F.store = ""; $("#fPartner").value = $("#fCity").value = "";
+    syncStores(); renderAll();
+  };
+  $$(".chip[data-p]").forEach(c => c.onclick = () => { P = c.dataset.p; CP = null; syncPeriodChips(); renderAll(); });
+  $("#resPeriod").onclick = () => { P = "p30"; CP = null; syncPeriodChips(); renderAll(); };
+  $("#dApply").onclick = applyCustom;
+  $("#dTo").onchange = () => { if($("#dFrom").value && $("#dTo").value) applyCustom(); };
+  $$(".tab").forEach(t => t.onclick = () => {
+    $$(".tab").forEach(x => x.classList.remove("on")); t.classList.add("on");
+    curTab = t.dataset.tab;
+    ["overview","movement","turnover","restock","category","perf","cwhub"].forEach(k => {
+      $("#tab-"+k).style.display = k === curTab ? "" : "none";
+    });
+    $("#kpis").style.display = (curTab === "perf" || curTab === "cwhub") ? "none" : "";   // 绩效/中心仓用自有指标卡
+    renderAll();
+  });
+  $("#movSearch").oninput = renderMovTable;
+  $("#movLevel").onchange = renderMovTable;
+  $("#rstSearch").oninput = renderRestockTable;
+  $("#rstLevel").onchange = renderRestockTable;
+  $("#cwProv").onchange = renderCwhub;
+  $("#cwGrade").onchange = renderCwhub;
+  $("#cwSearch").oninput = renderCwhub;
+  $("#cwInStock").onchange = renderCwhub;
+  $$(".chip[data-cp]").forEach(c => c.onclick = () => {
+    catPlat = c.dataset.cp;
+    $$(".chip[data-cp]").forEach(x => x.classList.toggle("on", x === c));
+    renderCategory();
+  });
+  $$(".chip[data-mp]").forEach(c => c.onclick = () => {
+    movPlat = c.dataset.mp;
+    $$(".chip[data-mp]").forEach(x => x.classList.toggle("on", x === c));
+    renderMovTable();
+  });
+  $$(".chip[data-sp]").forEach(c => c.onclick = () => {
+    storePlat = c.dataset.sp;
+    $$(".chip[data-sp]").forEach(x => x.classList.toggle("on", x === c));
+    renderStoreTable();
+  });
+  $$(".exp").forEach(b => b.onclick = () => exportCSV(b.dataset.exp));
+  if(DL && DL.dates && DL.dates.length){
+    const f0 = DL.dates[0], f1 = DL.dates[DL.dates.length - 1], p30 = PS["p30"];
+    ["#dFrom", "#dTo"].forEach(sel => { $(sel).min = f0; $(sel).max = f1; });
+    $("#dFrom").value = p30 ? p30.range.from : f0;
+    $("#dTo").value = p30 ? p30.range.to : f1;
+  } else {
+    $("#dApply").disabled = true;
+  }
+}
+function syncStores(){
+  const list = M.stores.filter(s => (!F.partner || s.vendor===F.partner) && (!F.city || s.city===F.city));
+  $("#fStore").innerHTML = '<option value="">全部门店</option>' + list.map(s=>`<option value="${s.id}">${s.name}</option>`).join("");
+  F.store = "";
+}
+function syncPeriodChips(){
+  $$(".chip[data-p]").forEach(c => c.classList.toggle("on", !CP && c.dataset.p === P));
+  const cc = $("#chipCustom");
+  cc.classList.toggle("on", !!CP);
+  cc.style.display = CP ? "" : "none";
+  $("#dHint").textContent = CP ? "" : (DL && DL.dates && DL.dates.length
+    ? `可查 ${DL.dates[0]} ~ ${DL.dates[DL.dates.length-1]}` : "暂无每日数据");
+}
+
+/* ---------- 自定义日期区间 ---------- */
+const DL = D.daily || null;
+function buildCustom(from, to){
+  if(!DL || !DL.dates || !DL.dates.length) return null;
+  const idx = DL.dates;
+  let i0 = idx.indexOf(from), i1 = idx.indexOf(to);
+  if(i0 < 0) i0 = 0;
+  if(i1 < 0) i1 = idx.length - 1;
+  if(i1 < i0){ const t = i0; i0 = i1; i1 = t; }
+  const n = i1 - i0 + 1;
+  const sum = (arr) => { let v = 0; for(let i=i0;i<=i1;i++) v += arr[i] || 0; return v; };
+
+  const storeSales = [], byVendor = {};
+  let gmv = 0, orders = 0, qty = 0;
+  Object.entries(DL.stores).forEach(([sid, s])=>{
+    const g = sum(s.g), o = sum(s.o), q = sum(s.q);
+    gmv += g; orders += o; qty += q;
+    if(g > 0 || o > 0) storeSales.push({name:s.n, storeId:sid, gmv:g, orders:o, qty:q});
+    // 注意：ERP 门店 ID 与街顺门店 ID 不同体系，按门店名匹配主体
+    const meta = M.stores.find(x => x.name === s.n);
+    if(meta) byVendor[meta.vendor] = (byVendor[meta.vendor] || 0) + g;
+  });
+  const heatmap = Object.entries(DL.channels)
+    .map(([ch, c]) => ({channel:ch, gmv:sum(c.g)})).filter(x => x.gmv > 0);
+  const charts = {partner: Object.entries(byVendor).map(([v, g]) => ({dimension_name:v, current:{gmv:g}}))};
+
+  // 趋势：本期每日 + 紧邻的上一个等长区间
+  const series = (a, b, tag) => {
+    const out = [];
+    for(let i=a;i<=b;i++){
+      let g = 0, o = 0, q = 0;
+      Object.values(DL.stores).forEach(s => { g += s.g[i]||0; o += s.o[i]||0; q += s.q[i]||0; });
+      out.push({period:tag, date:idx[i], gmv:g, order_count:o, sales_quantity:q});
+    }
+    return out;
+  };
+  const trend = [...series(Math.max(0, i0-n), i0-1, "previous"), ...series(i0, i1, "current")];
+  storeSales.sort((a,b) => b.gmv - a.gmv);
+  return {label:"自定义区间", range:{from:idx[i0], to:idx[i1], days:n},
+          summary:{gmv:gmv, order_count:orders, sales_quantity:qty},
+          storeSales, heatmap, charts, trend};
+}
+function applyCustom(){
+  const from = $("#dFrom").value, to = $("#dTo").value;
+  if(!from || !to){ $("#dHint").textContent = "请先选择起止日期"; return; }
+  const cp = buildCustom(from, to);
+  if(!cp){ $("#dHint").textContent = "缺少每日数据，请先刷新采集"; return; }
+  CP = cp; P = "custom";
+  storePlat = "全部";                                       // 自定义区间只有全平台口径
+  $$(".chip[data-sp]").forEach(x => x.classList.toggle("on", x.dataset.sp === "全部"));
+  $("#dFrom").value = cp.range.from; $("#dTo").value = cp.range.to;
+  $("#chipCustom").textContent = `自定义 ${cp.range.from.slice(5)} ~ ${cp.range.to.slice(5)}`;
+  syncPeriodChips(); renderAll();
+}
+
+/* ---------- 聚合 ---------- */
+function aggStores(stores){
+  const o = {stock:0,s3:0,s7:0,s14:0,s30:0,dag:0,amt:0,skuN:0,skuSell:0,deadStock:0,sold:0};
+  stores.forEach(st=>{
+    const g = SD[st.id]; if(!g) return;
+    o.stock+=g.stock; o.s3+=g.s3; o.s7+=g.s7; o.s14+=g.s14; o.s30+=g.s30; o.dag+=storeDaily(g);
+    o.amt+=g.amt; o.skuN+=g.skus.length; o.deadStock+=g.deadStock; o.sold+=g.sold;
+    g.skus.forEach(k=>{ if(k[6]>0) o.skuSell++; });
+  });
+  o.cover = o.dag>0 ? o.stock/o.dag : null;
+  o.rate = pct(o.skuSell, o.skuN);
+  return o;
+}
+let storePlat = "全部";                                     // 门店榜平台筛选（全部/美团/京东/淘宝闪购）
+function perStoreSales(name){
+  const p = curP(); if(!p) return null;
+  if(storePlat === "全部" || CP) return (p.storeSales||[]).find(x=>x.name===name) || null;
+  const byCh = ((D.storeCh||{})[P]||{}).channels || {};
+  const m = (byCh[storePlat]||{})[name];
+  return m ? {name, gmv:m.gmv, orders:m.orders, qty:m.qty} : {name, gmv:0, orders:0, qty:0};
+}
+/** SKU 级聚合（跨所选门店） */
+function skuRows(){
+  const sel = storeList(), m = new Map();
+  sel.forEach(st=>{
+    const g = SD[st.id]; if(!g) return;
+    g.skus.forEach(k=>{
+      const key = k[0];
+      const cur = m.get(key);
+      if(cur){ cur.stock+=k[2]; cur.s3+=k[3]; cur.s7+=k[4]; cur.s14+=k[5]; cur.s30+=k[6]; cur.dag+=k[7]; cur.q3+=k[11]; cur.stores++; cur.on += k[9]; }
+      else m.set(key,{sku:k[0],name:k[1],stock:k[2],s3:k[3],s7:k[4],s14:k[5],s30:k[6],dag:k[7],
+                      price:k[8],on:k[9],loc:k[10],q3:k[11],stores:1});
+    });
+  });
+  const out = [...m.values()];
+  out.forEach(r=>{
+    r.cover = coverOf(r);
+    r.amt = r.stock * (r.price||0);
+    r.lv = r.s30<=0 ? "D" : (r.dag>=1 ? "A" : (r.s30>=10 ? "B" : "C"));
+  });
+  return out;
+}
+const LV = {A:{t:"A · 热销",c:"red"},B:{t:"B · 常销",c:"orange"},C:{t:"C · 慢销",c:"yellow"},D:{t:"D · 零动销",c:"gray"}};
+
+function analyze(r){
+  const cover = r.cover, dag = r.dag||0;
+  if(r.s30>0 && r.stock<=0) return {state:"售罄·立即补",cls:"red",restock:Math.max(Math.ceil(dag*F.target),3),action:"立即补货"};
+  if(cover!==null && cover<7) return {state:"紧急补货",cls:"red",restock:Math.max(Math.ceil(dag*F.target)-r.stock,1),action:"今日补货"};
+  if(cover!==null && cover<F.target) return {state:"预警补货",cls:"orange",restock:Math.max(Math.ceil(dag*F.target)-r.stock,0),action:"计划补货"};
+  if(cover!==null && cover<=F.slow) return {state:"库存充足",cls:"green",restock:0,action:"无需补货"};
+  if(cover!==null) return {state:"压货",cls:"blue",restock:0,action:"调拨/促销"};
+  if(r.stock>0) return {state:"死库存",cls:"gray",restock:0,action:"清仓/退仓"};
+  return {state:"零库存未动销",cls:"gray",restock:0,action:"观察"};
+}
+const ORDER = {"售罄·立即补":0,"紧急补货":1,"预警补货":2,"库存充足":3,"压货":4,"死库存":5,"零库存未动销":6};
+
+/* ---------- KPI ---------- */
+function renderKpis(){
+  const sel = storeList(), a = aggStores(sel), p = curP();
+  let gmv=0, orders=0;
+  sel.forEach(st=>{ const r = perStoreSales(st.name); if(r){ gmv+=r.gmv||0; orders+=r.orders||0; } });
+  const qty = p.summary ? p.summary.sales_quantity : a.s30;
+  const withSalesStores = sel.filter(s=>{const r=perStoreSales(s.name); return r && r.gmv>0;}).length;
+  let need=0, needCnt=0, urgent=0, over=0, overCnt=0, deadCnt=0;
+  sel.forEach(st=>{
+    const g = SD[st.id]; if(!g) return;
+    g.skus.forEach(k=>{
+      const r = {sku:k[0],name:k[1],stock:k[2],s3:k[3],s7:k[4],s14:k[5],s30:k[6],dag:k[7],price:k[8],q3:k[11]};
+      r.cover = coverOf(r);
+      const v = analyze(r);
+      if(v.state==="售罄·立即补"||v.state==="紧急补货") urgent++;
+      if(v.restock>0){ needCnt++; need+=v.restock; }
+      if(v.state==="压货"){ overCnt++; over+=k[2]; }
+      if(v.state==="死库存") deadCnt++;
+    });
+  });
+  const cards = [
+    {lab:"订单销售额", val:money(gmv), foot:`${p.range.from} ~ ${p.range.to}（${p.range.days}天）`, cls:""},
+    {lab:"有效订单数", val:fmt(orders), foot:`客单价 ${orders?money(gmv/orders):"—"}`, cls:""},
+    {lab:"销售件数", val:fmt(qty), foot:`店日均销 ${money(withSalesStores?gmv/p.range.days/withSalesStores:0)}`, cls:""},
+    {lab:"SKU 动销率", val:a.rate.toFixed(1)+"%", foot:`${fmt(a.skuSell)} / ${fmt(a.skuN)} 个店-SKU 有销量`, cls:"blue"},
+    {lab:"整体可售天数", val:a.cover==null?"—":a.cover.toFixed(0)+" 天", foot:`库存 ${fmt(a.stock)} 件 · 日均 ${a.dag.toFixed(1)}`, cls:(a.cover!=null&&a.cover>90)?"red":""},
+    {lab:"需补货", val:`${fmt(need)} 件`, foot:`${fmt(needCnt)} 个店-SKU · 紧急 ${fmt(urgent)}`, cls:urgent>0?"red":"green"},
+    {lab:"压货库存", val:`${fmt(over)} 件`, foot:`${fmt(overCnt)} 组合可售>${F.slow}天 · 死库存 ${fmt(deadCnt)}`, cls:over>0?"orange":""},
+  ];
+  $("#kpis").innerHTML = cards.map(k=>`<div class="kpi ${k.cls}"><div class="lab">${k.lab}</div><div class="val">${k.val}</div><div class="foot">${k.foot}</div></div>`).join("");
+  const ex = M.excluded;
+  const note = $("#exclNote");
+  if(note) note.innerHTML = (ex && ex.qty)
+    ? `<b>库存口径：</b>已剔除 <b>赠品 / 包装袋</b> ${fmt(ex.rows)} 个店-SKU、<b>${fmt(ex.qty)}</b> 件 / ${money(ex.amt)}，不计入库存件数、库存金额、周转与补货建议（SKU 明细同步隐藏）。`
+    : "";
+}
+
+/* ---------- 趋势 ---------- */
+function renderTrend(){
+  const p = curP(), tr = p.trend||[];
+  const cur = tr.filter(x=>x.period==="current"), prev = tr.filter(x=>x.period==="previous");
+  $("#trendTip").textContent = `${p.range.from} ~ ${p.range.to}（${p.range.days}天）`;
+  const W=760,H=250,PD={l:48,r:12,t:12,b:24};
+  const all=[...cur,...prev].map(x=>x.gmv||0), max=Math.max(...all,1)*1.1;
+  const n=Math.max(cur.length,prev.length,1), xw=(W-PD.l-PD.r)/Math.max(n-1,1);
+  const y=v=>H-PD.b-(v/max)*(H-PD.t-PD.b);
+  const line=arr=>arr.map((pt,i)=>`${i?"L":"M"}${(PD.l+i*xw).toFixed(1)},${y(pt.gmv||0).toFixed(1)}`).join("");
+  let grid="";
+  for(let i=0;i<=4;i++){const v=max/4*i, yy=y(v);
+    grid+=`<line x1="${PD.l}" y1="${yy}" x2="${W-PD.r}" y2="${yy}" stroke="#efe9df"/><text x="${PD.l-6}" y="${yy+4}" font-size="10" fill="#8a8272" text-anchor="end">${(v/10000).toFixed(1)}万</text>`;}
+  const step=Math.max(1,Math.floor(cur.length/6));
+  const labels=cur.filter((_,i)=>i%step===0).map((pt,i)=>`<text x="${PD.l+i*step*xw}" y="${H-6}" font-size="10" fill="#8a8272">${pt.date.slice(5)}</text>`).join("");
+  $("#trendChart").innerHTML=`<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto">${grid}
+    <path d="${line(prev)}" fill="none" stroke="#c9bfb2" stroke-width="2" stroke-dasharray="4 3"/>
+    <path d="${line(cur)}" fill="none" stroke="var(--brand)" stroke-width="2.5"/>${labels}</svg>
+    <div style="display:flex;gap:16px;font-size:12px;color:var(--muted);margin-top:2px">
+      <span>本期 ${money(cur.reduce((s,x)=>s+(x.gmv||0),0))}</span>
+      <span>上期 ${money(prev.reduce((s,x)=>s+(x.gmv||0),0))}</span></div>`;
+}
+
+/* ---------- 渠道 / 主体 ---------- */
+function renderChannel(){
+  const p = curP();
+  const colors={"美团":"#ff8a00","京东":"#c0392b","淘宝闪购":"#ff5000","抖音":"#111"};
+  // 渠道 GMV + 订单：优先 ERP 渠道表（含 order_count）；自定义区间用日立方渠道数组；兜底 heatmap（仅 GMV）
+  let chans = [];
+  const ech = (p.charts && p.charts.channel) || [];
+  if(ech.length){
+    chans = ech.map(c=>({ch:c.dimension_name, gmv:(c.current||{}).gmv||0, ord:(c.current||{}).order_count||0}));
+  } else if(DL && DL.channels){
+    const idx = DL.dates;
+    let i0 = idx.indexOf(p.range.from), i1 = idx.indexOf(p.range.to);
+    if(i0 < 0) i0 = 0;
+    if(i1 < 0) i1 = idx.length-1;
+    if(i1 < i0){ const t=i0; i0=i1; i1=t; }
+    chans = Object.entries(DL.channels).map(([ch,c])=>{
+      let g=0, o=0;
+      for(let i=i0;i<=i1;i++){ g += c.g[i]||0; o += (c.o ? c.o[i] : 0)||0; }
+      return {ch, gmv:g, ord:o};
+    });
+  } else if(p.heatmap){
+    const byCh={};
+    p.heatmap.forEach(h=>byCh[h.channel]=(byCh[h.channel]||0)+(h.gmv||0));
+    chans = Object.entries(byCh).map(([ch,gmv])=>({ch, gmv, ord:null}));
+  }
+  chans = chans.filter(c => c.gmv > 0 || c.ord > 0).sort((a,b)=>b.gmv-a.gmv);
+  const total = chans.reduce((s,c)=>s+c.gmv,0)||1;
+  const totalOrd = chans.reduce((s,c)=>s+(c.ord||0),0);
+  $("#channelChart").innerHTML = chans.length ? chans.map(c=>{
+    const pc = c.gmv/total*100;
+    const aov = c.ord ? money(c.gmv/c.ord) : "—";
+    const ordTxt = c.ord==null ? "" : `${fmt(c.ord)} 单 · 客单 ${aov}`;
+    return `<div style="margin-bottom:9px">
+      <div style="display:flex;justify-content:space-between;font-size:12.5px"><span>${c.ch} <span class="muted">${ordTxt}</span></span><b class="num">${money(c.gmv)} · ${pc.toFixed(1)}%</b></div>
+      <div class="bar-wrap" style="height:16px;margin-top:3px"><div class="bar" style="width:${pc}%;background:${colors[c.ch]||"#888"}"></div></div></div>`;
+  }).join("") + `<div class="muted" style="font-size:11.5px;margin-top:2px">合计 <b>${fmt(totalOrd)}</b> 单 · 客单 <b>${totalOrd?money(total/totalOrd):"—"}</b></div>`
+    : '<div class="empty">无渠道数据</div>';
+
+  const pdata = p.charts && p.charts.partner || [];
+  $("#partnerCards").innerHTML = pdata.map(c=>{
+    const name = c.dimension_name;
+    const sts = M.stores.filter(s=>s.vendor===name);
+    const a = aggStores(sts);
+    const gmv = (c.current||{}).gmv||0;
+    const rate = a.rate;
+    return `<div style="display:flex;justify-content:space-between;gap:8px;padding:8px 0;border-bottom:1px solid #f1ede6;font-size:12.5px">
+      <span><b>${name}</b> <span class="muted">${sts.length}店</span></span>
+      <span class="num muted">GMV ${money(gmv)} · 库存 ${fmt(a.stock)} · 动销率 <b style="color:${rate<10?"var(--red)":"var(--green)"}">${rate.toFixed(1)}%</b> · 周转 ${a.cover==null?"—":a.cover.toFixed(0)+"天"}</span></div>`;
+  }).join("") || '<div class="empty">无数据</div>';
+}
+
+/* ---------- 门店榜 ---------- */
+function storeRows(){
+  return storeList().map(st=>{
+    const g = SD[st.id]||{stock:0,s30:0,dag:0,amt:0,deadStock:0,skus:[]};
+    const r = perStoreSales(st.name);
+    const cover = storeDaily(g)>0 ? g.stock/storeDaily(g) : null;
+    let lv="—", cls="gray";
+    if(g.s30<=0){ lv="无动销"; cls="gray"; }
+    else if(cover==null){ lv="—"; cls="gray"; }
+    else if(cover<14){ lv="补货优先"; cls="red"; }
+    else if(cover<=F.slow){ lv="健康"; cls="green"; }
+    else { lv="压货"; cls="orange"; }
+    return {st, g, gmv:r?r.gmv:0, orders:r?r.orders:0, cover, lv, cls};
+  }).sort((a,b)=>b.gmv-a.gmv);
+}
+function renderStoreTable(){
+  const platOn = storePlat !== "全部" && !CP;
+  const platName = storePlat === "淘宝闪购" ? "淘闪" : storePlat;
+  $("#thGmv").textContent = platOn ? `GMV(元)·${platName}` : "GMV(元)";
+  $("#storeTip").textContent = CP
+    ? "自定义区间为全平台口径 · 库存/销量/周转为街顺全平台实时（已剔除赠品/包装袋）"
+    : platOn
+      ? `GMV/订单 仅统计 ${platName} · 库存/销量/周转为街顺全平台实时（已剔除赠品/包装袋）`
+      : "GMV/订单 按所选时间段与平台 · 库存/销量/周转为街顺全平台实时（已剔除赠品/包装袋）";
+  const rows = storeRows(), maxG = Math.max(...rows.map(r=>r.gmv),1);
+  $("#storeTable tbody").innerHTML = rows.length ? rows.map(({st,g,gmv,orders,cover,lv,cls})=>`
+    <tr style="cursor:pointer" onclick="jumpStore('${st.id}')">
+      <td><b>${st.name}</b></td><td>${st.vendor}</td><td>${st.city.replace("市","")}</td>
+      <td class="r num"><b>${fmt(gmv)}</b><div class="bar-wrap" style="margin-top:3px;height:7px"><div class="bar" style="width:${pct(gmv,maxG).toFixed(1)}%;background:var(--brand)"></div></div></td>
+      <td class="r num">${fmt(orders)}</td>
+      <td class="r num">${fmt(g.stock)}</td>
+      <td class="r num">${fmt(g.s30)}</td>
+      <td class="r num">${storeDaily(g).toFixed(1)}</td>
+      <td class="r num" style="color:${cover==null?"var(--muted)":cover>F.slow?"var(--orange)":cover<14?"var(--red)":"var(--text)"}">${cover==null?"—":cover.toFixed(0)}</td>
+      <td><span class="pill ${cls}">${lv}</span></td></tr>`).join("")
+    : `<tr><td colspan="10" class="empty">没有符合条件的数据</td></tr>`;
+}
+function jumpStore(id){ $("#fStore").value=id; F.store=id; renderAll(); scrollTo({top:0,behavior:"smooth"}); }
+
+/* ---------- 商品动销 ---------- */
+let movPlat = "全部";                                       // 动销页平台筛选
+function movRows(){
+  // 当前时间段 · 全部平台（销量/近3·7·14天取日立方；库存保持街顺口径；剔除赠品/包装袋）
+  const p = curP(), days = p.range.days;
+  const ca = cubeAgg(p.range.from, p.range.to, null, cubeAllowMask());
+  const base = skuRows(), seen = new Set(), out = [];
+  base.forEach(r=>{
+    if(catIsEx(r.name)) return;
+    seen.add(r.sku);
+    const o = Object.assign({}, r);
+    const x = ca && ca.m.get(r.sku);
+    if(x){ o.q3=x.t3; o.s7=x.t7; o.s14=x.t14; o.s30=x.q; o.dag=x.q/days; o.stores=x.st; }
+    else if(ca){ o.q3=o.s7=o.s14=o.s30=0; o.dag=0; o.stores=0; }
+    o.amt = o.stock * (o.price||0);
+    o.cover = o.dag>0 ? o.stock/o.dag : null;
+    o.lv = lvOf(o.s30, o.dag, days);
+    out.push(o);
+  });
+  if(ca) ca.m.forEach((x, sku)=>{                            // 立方有销量但街顺缺失的 SKU
+    if(seen.has(sku)) return;
+    const nm = (SK[sku] && SK[sku].name) || CUBE.bySku[sku].name;
+    if(catIsEx(nm)) return;
+    const dag = x.q/days;
+    out.push({sku, name:nm, stock:0, s3:x.t3, s7:x.t7, s14:x.t14, s30:x.q, q3:x.t3,
+              price:0, stores:x.st, amt:0, dag, cover:null, lv:lvOf(x.q, dag, days)});
+  });
+  return out;
+}
+function movPlatRows(){
+  const p = curP();
+  if(movPlat==="全部") return null;
+  const ca = cubeAgg(p.range.from, p.range.to, movPlat, cubeAllowMask());
+  if(!ca) return null;
+  const rows = [];
+  ca.m.forEach((x, sku)=>{
+    const meta = SK[sku] || {};
+    rows.push({sku, name: meta.name || CUBE.bySku[sku].name, s30:x.q, amt:x.g, stores:x.st,
+               dag: x.q/ca.days});
+  });
+  return rows;
+}
+function renderMovDist(){
+  const p = curP(), rows = movRows(), total = rows.length||1;
+  const cnt = k => rows.filter(r=>r.lv===k).length;
+  const segs = [["A · 热销(日均≥1)",cnt("A"),"var(--red)"],["B · 常销(折算≥10件/30天)",cnt("B"),"var(--orange)"],
+                ["C · 慢销",cnt("C"),"#c9a227"],["D · 零动销",cnt("D"),"#c4bfb6"]];
+  let acc=0;
+  const bar = segs.map(([t,v,c])=>{const w=v/total*100;const s=`<div style="position:absolute;left:${acc}%;width:${w}%;top:0;height:100%;background:${c}" title="${t}: ${v}"></div>`;acc+=w;return s;}).join("");
+  $("#movDist").innerHTML=`<div style="position:relative;height:24px;border-radius:8px;overflow:hidden;background:#f0ece4">${bar}</div>
+    <div class="legend" style="margin-top:9px">${segs.map(([t,v,c])=>`<span><i style="background:${c}"></i>${t}: <b>${fmt(v)}</b> (${pct(v,total).toFixed(1)}%)</span>`).join("")}</div>`;
+  $("#tabMov").textContent = fmt(total);
+}
+function renderMovTable(){
+  const kw = ($("#movSearch").value||"").toLowerCase(), lvF = $("#movLevel").value;
+  const isAll = movPlat==="全部";
+  const p = curP();
+  $("#movRange").textContent = `${p.range.from} ~ ${p.range.to}（${p.range.days}天）`;
+  // 动态表头
+  $("#movThead").innerHTML = isAll
+    ? `<th>SKU / 商品</th><th class="r">近3天</th><th class="r">近7天</th><th class="r">近14天</th><th class="r">区间销量</th>
+       <th class="r">日均</th><th class="r">库存</th><th class="r">可售天数</th><th>等级</th><th class="r">动销门店数</th>`
+    : `<th>SKU / 商品</th><th class="r">区间销量</th><th class="r">日均</th><th class="r">销售额(元)</th><th class="r">动销门店数</th>`;
+  if(!isAll){
+    const rows = (movPlatRows()||[])
+      .filter(r=>!kw||r.name.toLowerCase().includes(kw)||r.sku.toLowerCase().includes(kw))
+      .sort((a,b)=>b.s30-a.s30||b.stores-a.stores);
+    const show = rows.slice(0,300);
+    $("#movTable tbody").innerHTML = show.length ? show.map(r=>`
+      <tr>
+        <td class="sku-name" title="${r.name}">${r.name}<div class="muted" style="font-size:10.5px">${r.sku}</div></td>
+        <td class="r num"><b>${fmt(r.s30)}</b></td>
+        <td class="r num">${r.dag.toFixed(1)}</td>
+        <td class="r num">${money(r.amt)}</td>
+        <td class="r num">${r.stores}</td>
+      </tr>`).join("") : `<tr><td colspan="5" class="empty">没有符合条件的数据</td></tr>`;
+    const tot = rows.reduce((s,r)=>s+r.s30,0), tg = rows.reduce((s,r)=>s+r.amt,0);
+    $("#movFoot").innerHTML = `<b>${movPlat}口径：</b>街顺商品分析（${p.range.from}~${p.range.to}，已剔除赠品/包装袋）。当前筛选 <b>${fmt(rows.length)}</b> 个 SKU，合计 <b>${fmt(tot)}</b> 件 / ${money(tg)}。库存/等级为门店库存口径，无法按平台拆分，切回「全部」查看。`;
+    return;
+  }
+  const rows = movRows()
+    .filter(r=>!lvF||r.lv===lvF)
+    .filter(r=>!kw||r.name.toLowerCase().includes(kw)||r.sku.toLowerCase().includes(kw))
+    .sort((a,b)=>b.s30-a.s30||b.stock-a.stock);
+  const show = rows.slice(0,300);
+  $("#movTable tbody").innerHTML = show.length ? show.map(r=>{
+    const L = LV[r.lv];
+    return `<tr>
+      <td class="sku-name" title="${r.name}">${r.name}<div class="muted" style="font-size:10.5px">${r.sku}</div></td>
+      <td class="r num">${fmt(r.q3)}</td><td class="r num">${fmt(r.s7)}</td><td class="r num">${fmt(r.s14)}</td>
+      <td class="r num"><b>${fmt(r.s30)}</b></td>
+      <td class="r num">${r.dag.toFixed(1)}</td>
+      <td class="r num">${fmt(r.stock)}</td>
+      <td class="r num" style="color:${r.cover==null?"var(--muted)":r.cover<7?"var(--red)":r.cover<=F.slow?"var(--text)":"var(--orange)"}">${r.cover==null?"—":r.cover.toFixed(0)}</td>
+      <td><span class="pill ${L.c}">${L.t}</span></td>
+      <td class="r num">${r.stores}</td></tr>`;
+  }).join("") : `<tr><td colspan="10" class="empty">没有符合条件的数据</td></tr>`;
+  $("#movFoot").innerHTML = `共 <b>${fmt(rows.length)}</b> 个 SKU${rows.length>300?"，显示前 300 条（按区间销量排序），导出 CSV 可拿全量":""}。<b>已剔除赠品/包装袋</b>，动销分布同口径；销量/近3·7·14天为所选时间段（区间末尾倒推），库存为实时快照。`;
+}
+
+/* ---------- 库存周转 ---------- */
+function bucketRows(){
+  // 店-SKU 粒度（与补货决策一致），避免跨门店汇总把售罄/死库存平均掉
+  const rows = [];
+  storeList().forEach(st=>{
+    const g = SD[st.id]; if(!g) return;
+    g.skus.forEach(k=>{
+      const r = {sku:k[0], name:k[1], stock:k[2], s30:k[6], dag:k[7]};
+      r.cover = coverOf(r);
+      rows.push(r);
+    });
+  });
+  const buckets = [
+    {k:"售罄", f:r=>r.s30>0&&r.stock<=0, c:"var(--red)"},
+    {k:"紧急 <7天", f:r=>r.cover!=null&&r.cover<7&&!(r.s30>0&&r.stock<=0), c:"#e05b3a"},
+    {k:"预警 7-14天", f:r=>r.cover!=null&&r.cover>=7&&r.cover<14, c:"var(--orange)"},
+    {k:"健康 14-60天", f:r=>r.cover!=null&&r.cover>=14&&r.cover<=60, c:"var(--green)"},
+    {k:`压货 60-90天`, f:r=>r.cover!=null&&r.cover>60&&r.cover<=90, c:"var(--blue)"},
+    {k:"超压 >90天", f:r=>r.cover!=null&&r.cover>90, c:"#8e6fb0"},
+    {k:"死库存(零动销)", f:r=>r.cover==null&&r.stock>0, c:"var(--gray)"},
+  ];
+  return buckets.map(b=>{
+    const rs = rows.filter(b.f), stock = rs.reduce((s,r)=>s+r.stock,0);
+    return {...b, n:rs.length, stock, amt:rs.reduce((s,r)=>s+r.amt,0), rs};
+  });
+}
+function renderBuckets(){
+  const bs = bucketRows(), totalStock = bs.reduce((s,b)=>s+b.stock,0)||1;
+  const W=680, H=230, PL=96, PR=54, rowH=30;
+  const maxN = Math.max(...bs.map(b=>b.n),1);
+  const svg = bs.map((b,i)=>{
+    const y = i*rowH+12, w = (b.n/maxN)*(W-PL-PR);
+    return `<text x="${PL-8}" y="${y+13}" font-size="11.5" fill="#2b2620" text-anchor="end">${b.k}</text>
+      <rect x="${PL}" y="${y}" width="${Math.max(w,2)}" height="17" rx="4" fill="${b.c}" opacity=".85"/>
+      <text x="${PL+Math.max(w,2)+8}" y="${y+13}" font-size="11.5" fill="#8a8272">${fmt(b.n)} 个 · ${fmt(b.stock)} 件 (${pct(b.stock,totalStock).toFixed(1)}%)</text>`;
+  }).join("");
+  $("#bucketChart").innerHTML = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto">${svg}</svg>
+    <div class="hint">条形长度 = 该分层「店-SKU」数量；括号内为库存件数占比。粒度与补货决策一致。</div>`;
+}
+function renderTurnTable(){
+  const rows = storeRows().sort((a,b)=>(b.cover==null?-1:b.cover)-(a.cover==null?-1:a.cover));
+  const maxC = Math.max(...rows.map(r=>r.cover||0),1);
+  $("#turnTable tbody").innerHTML = rows.length ? rows.map(({st,g,cover,lv,cls})=>`
+    <tr>
+      <td><b>${st.name}</b></td><td>${st.vendor}</td><td>${st.city.replace("市","")}</td>
+      <td class="r num">${fmt(g.stock)}</td>
+      <td class="r num">${money(g.amt)}</td>
+      <td class="r num">${fmt(g.s30)}</td>
+      <td class="r num">${storeDaily(g).toFixed(1)}</td>
+      <td class="r num"><b style="color:${cover==null?"var(--muted)":cover>F.slow?"var(--orange)":cover<14?"var(--red)":"var(--text)"}">${cover==null?"—":cover.toFixed(0)}</b></td>
+      <td><div class="bar-wrap"><div class="bar" style="width:${cover==null?0:Math.min(cover/maxC*100,100)}%;background:${cover==null?"#ccc":cover<14?"var(--red)":cover<=F.slow?"var(--green)":"var(--orange)"}"></div></div></td>
+      <td><span class="pill ${cls}">${lv}</span></td></tr>`).join("")
+    : `<tr><td colspan="10" class="empty">没有符合条件的数据</td></tr>`;
+}
+
+/* ---------- 补货决策 ---------- */
+function restockRows(){
+  const rows = [];
+  storeList().forEach(st=>{
+    const g = SD[st.id]; if(!g) return;
+    g.skus.forEach(k=>{
+      const r = {sku:k[0],name:k[1],stock:k[2],s3:k[3],s7:k[4],s14:k[5],s30:k[6],dag:k[7],price:k[8],q3:k[11],
+                 upc:k[12]||"",upcs:k[13]||""};
+      r.cover = coverOf(r);
+      const a = analyze(r);
+      rows.push({st, r, a});
+    });
+  });
+  return rows;
+}
+function renderRestockKpi(rows){
+  const sumStock = f => rows.filter(f).reduce((s,x)=>s+x.r.stock,0);
+  const cnt = f => rows.filter(f).length;
+  const need = rows.filter(x=>x.a.restock>0);
+  const cards = [
+    {lab:"售罄·立即补", v:cnt(x=>x.a.state==="售罄·立即补"), foot:"30天有销量但库存为0", cls:"red"},
+    {lab:"紧急补货(<7天)", v:cnt(x=>x.a.state==="紧急补货"), foot:`建议补 ${fmt(rows.filter(x=>x.a.state==="紧急补货").reduce((s,x)=>s+x.a.restock,0))} 件`, cls:"red"},
+    {lab:"预警补货", v:cnt(x=>x.a.state==="预警补货"), foot:`建议补 ${fmt(rows.filter(x=>x.a.state==="预警补货").reduce((s,x)=>s+x.a.restock,0))} 件`, cls:"orange"},
+    {lab:`压货(>${F.slow}天)`, v:cnt(x=>x.a.state==="压货"), foot:`占用 ${fmt(sumStock(x=>x.a.state==="压货"))} 件`, cls:"blue"},
+    {lab:"死库存(零动销)", v:cnt(x=>x.a.state==="死库存"), foot:`占用 ${fmt(sumStock(x=>x.a.state==="死库存"))} 件`, cls:"gray"},
+    {lab:"总建议补货量", v:fmt(need.reduce((s,x)=>s+x.a.restock,0))+" 件", foot:`覆盖 ${F.target} 天 · ${fmt(need.length)} 个店-SKU`, cls:"green"},
+  ];
+  $("#rstKpis").innerHTML = '<div style="display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:14px">' +
+    cards.map(c=>`<div class="kpi ${c.cls}"><div class="lab">${c.lab}</div><div class="val">${c.v}</div><div class="foot">${c.foot}</div></div>`).join("") + "</div>";
+}
+function renderRestockTable(){
+  const rows = restockRows();
+  renderRestockKpi(rows);
+  const lvF = $("#rstLevel").value, kw = ($("#rstSearch").value||"").toLowerCase();
+  const f = x => {
+    if(lvF==="need") return x.a.restock>0;
+    if(lvF==="urgent") return ["售罄·立即补","紧急补货"].includes(x.a.state);
+    if(lvF==="over") return x.a.state==="压货";
+    if(lvF==="dead") return x.a.state==="死库存";
+    return true;
+  };
+  const list = rows.filter(f)
+    .filter(x=>!kw||x.st.name.toLowerCase().includes(kw)||x.r.name.toLowerCase().includes(kw)
+      ||(x.r.upc||"").includes(kw)||(x.r.sku||"").toLowerCase().includes(kw))
+    .sort((a,b)=>(ORDER[a.a.state]??9)-(ORDER[b.a.state]??9)||b.a.restock-a.a.restock||b.r.s30-a.r.s30);
+  const show = list.slice(0,300);
+  $("#rstTable tbody").innerHTML = show.length ? show.map(x=>{
+    const c = x.a.cover;
+    return `<tr class="${x.a.state==="死库存"?"dead":""}">
+      <td style="max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${x.st.name}">${x.st.name.replace("图拉斯专卖店","")}</td>
+      <td class="num upc" title="${x.r.upcs?("全部条码："+x.r.upcs):x.r.upc}">${x.r.upc||"<span class='muted'>—</span>"}</td>
+      <td class="num skucode">${x.r.sku||"<span class='muted'>—</span>"}</td>
+      <td class="sku-name" title="${x.r.name}">${x.r.name}</td>
+      <td class="r num">${fmt(x.r.q3)}</td><td class="r num">${fmt(x.r.s7)}</td><td class="r num">${fmt(x.r.s14)}</td>
+      <td class="r num"><b>${fmt(x.r.s30)}</b></td>
+      <td class="r num">${x.r.dag.toFixed(1)}</td>
+      <td class="r num">${fmt(x.r.stock)}</td>
+      <td class="r num" style="color:${c==null?"var(--muted)":c<7?"var(--red)":c<=F.slow?"var(--text)":"var(--orange)"}">${c==null?"—":c.toFixed(0)}</td>
+      <td><span class="pill ${x.a.cls}">${x.a.state}</span></td>
+      <td class="r num">${x.a.restock>0?`<b style="color:var(--brand)">${fmt(x.a.restock)}</b>`:'<span class="muted">—</span>'}</td>
+      <td>${x.a.action}</td></tr>`;
+  }).join("") : `<tr><td colspan="14" class="empty">没有符合条件的数据</td></tr>`;
+  $("#rstFoot").innerHTML = `共 <b>${fmt(list.length)}</b> 条${list.length>300?"，显示前 300 条（紧急在前），导出 CSV 可拿完整清单":""}。`;
+  $("#tabRst").textContent = fmt(list.length);
+}
+
+/* ---------- 品类 ---------- */
+const CAT_COLORS={"手机膜":"#b3541e","手机壳":"#e67e22","充电宝":"#8e44ad","充电器":"#c0392b","数据线":"#16a085","其他":"#95a5a6"};
+const CAT_EX_KW=["赠","打包袋","包装袋"];                    // 剔除：赠品/打包袋/包装袋
+const catIsEx = n => CAT_EX_KW.some(w=>(n||"").includes(w));
+let catPlat = "全部";                                        // 当前平台筛选
+function catpf(){ return (D.catpf && D.catpf.plats) || null; }
+
+/* ---------- 商品分析 90 天日立方（支持任意时间段重算） ---------- */
+let CUBE = null;
+(function initCube(){
+  const c = D.catpf && D.catpf.cube;
+  if(!c || !c.recs || !c.dates) return;
+  const bySku = {};
+  c.skus.forEach(s => { bySku[s[0]] = {name:s[1], cat:s[2], recs:[]}; });
+  c.recs.forEach(r => {
+    const o = bySku[c.skus[r[0]][0]];
+    if(o) o.recs.push({pc:r[1], days:r[2]});                 // days: [[dayIdx,q,g,storeMask],...]
+  });
+  CUBE = {dates:c.dates, stores:c.stores, bySku};
+})();
+const popcnt = m => { let n=0; while(m){ m &= m-1; n++; } return n; };
+function cubeAllowMask(){
+  if(!CUBE) return 0;
+  const sel = storeList().map(s=>String(s.id));
+  let m = 0;
+  CUBE.stores.forEach((sid,i) => { if(sel.includes(sid)) m |= (1<<i); });
+  return m || ((1<<CUBE.stores.length)-1);
+}
+/** 区间聚合：返回 {m:Map(sku->{q,g,st,t3,t7,t14}), days, covered, from, to} */
+function cubeAgg(from, to, plat, allowMask){
+  if(!CUBE) return null;
+  const idx = CUBE.dates;
+  let i0 = idx.indexOf(from), i1 = idx.indexOf(to);
+  const covered = i0 >= 0 && i1 >= 0;
+  if(i0 < 0) i0 = 0;
+  if(i1 < 0) i1 = idx.length - 1;
+  if(i1 < i0){ const t=i0; i0=i1; i1=t; }
+  const pcW = plat && plat !== "全部" ? ({"淘宝":1,"美团":3,"京东":6,"其他":0})[plat] : null;
+  const m = new Map();
+  for(const sku in CUBE.bySku){
+    const o = CUBE.bySku[sku];
+    let q=0, g=0, mask=0, t3=0, t7=0, t14=0;
+    for(const r of o.recs){
+      if(pcW !== null && r.pc !== pcW) continue;
+      for(const d of r.days){
+        const di = d[0];
+        if(di < i0 || di > i1) continue;
+        q += d[1]; g += d[2]; mask |= d[3];
+        if(di > i1-3)  t3  += d[1];
+        if(di > i1-7)  t7  += d[1];
+        if(di > i1-14) t14 += d[1];
+      }
+    }
+    if(q > 0) m.set(sku, {q, g, st: popcnt(mask & allowMask), t3, t7, t14});
+  }
+  return {m, days: i1-i0+1, covered, from: idx[i0], to: idx[i1]};
+}
+/** 等级（区间折算30天口径，与原 A/B/C/D 阈值一致） */
+function lvOf(q, dag, days){
+  return q<=0 ? "D" : (dag>=1 ? "A" : (q >= 10*days/30 ? "B" : "C"));
+}
+function catRows(){
+  // 全部平台 · 当前时间段（销量取商品分析日立方；SKU数/库存保持街顺口径）
+  const p = curP(), days = p.range.days;
+  const ca = cubeAgg(p.range.from, p.range.to, null, cubeAllowMask());
+  const rows = skuRows(), seen = new Set(), m = {};
+  rows.forEach(r=>{
+    if(catIsEx(r.name)) return;                              // 剔除赠品/打包袋
+    seen.add(r.sku);
+    const c = SK[r.sku] ? SK[r.sku].cat : "其他";
+    const a = m[c] || (m[c] = {c, skus:0, s30:0, gmv:0, stock:0, amt:0, dag:0});
+    a.skus++; a.stock+=r.stock; a.amt+=r.amt;
+    const x = ca && ca.m.get(r.sku);
+    a.s30 += x ? x.q : (ca ? 0 : r.s30);
+    a.gmv += x ? x.g : 0;
+    a.dag += x ? x.q/days : (ca ? 0 : dailyOf(r));
+  });
+  if(ca) ca.m.forEach((x, sku)=>{                            // 立方有销量但街顺缺失的 SKU
+    if(seen.has(sku)) return;
+    const nm = (SK[sku] && SK[sku].name) || CUBE.bySku[sku].name;
+    if(catIsEx(nm)) return;
+    const c = (SK[sku] && SK[sku].cat) || CUBE.bySku[sku].cat || "其他";
+    const a = m[c] || (m[c] = {c, skus:0, s30:0, gmv:0, stock:0, amt:0, dag:0});
+    a.skus++; a.s30 += x.q; a.gmv += x.g; a.dag += x.q/days;
+  });
+  const out = Object.values(m);
+  const total = out.reduce((s,a)=>s+a.s30,0)||1;
+  out.forEach(a=>{ a.share = a.s30/total*100; a.cover = a.dag>0 ? a.stock/a.dag : null; });
+  return out.sort((a,b)=>b.s30-a.s30);
+}
+function catRowsPlat(){
+  // 指定平台 · 当前时间段
+  const p = curP();
+  const ca = cubeAgg(p.range.from, p.range.to, catPlat, cubeAllowMask());
+  if(!ca) return null;
+  const m = {};
+  ca.m.forEach((x, sku)=>{
+    const c = (SK[sku] && SK[sku].cat) || CUBE.bySku[sku].cat || "其他";
+    const a = m[c] || (m[c] = {c, skus:0, s30:0, amt:0});
+    a.skus++; a.s30 += x.q; a.amt += x.g;
+  });
+  const out = Object.values(m);
+  const total = out.reduce((s,a)=>s+a.s30,0)||1;
+  out.forEach(a=>{ a.share = a.s30/total*100; });
+  return out.sort((a,b)=>b.s30-a.s30);
+}
+function renderCategory(){
+  const isAll = catPlat==="全部";
+  const p = curP();
+  let rows, tot, totGmv=null;
+  if(isAll){
+    rows = catRows(); tot = rows.reduce((s,r)=>s+r.s30,0);
+  }else{
+    rows = catRowsPlat()||[]; tot = rows.reduce((s,r)=>s+r.s30,0);
+    totGmv = rows.reduce((s,r)=>s+r.amt,0);
+  }
+  const maxQ = Math.max(...rows.map(r=>r.s30),1);
+  $("#catBars").innerHTML = rows.length ? rows.map(r=>`
+    <div style="margin-bottom:11px">
+      <div style="display:flex;justify-content:space-between;font-size:12.5px">
+        <span><b>${r.c}</b> <span class="muted">· ${fmt(r.skus)} SKU</span></span>
+        <b class="num">${fmt(r.s30)} 件 · ${r.share.toFixed(1)}%</b></div>
+      <div class="bar-wrap" style="height:17px;margin-top:3px"><div class="bar" style="width:${(r.s30/maxQ*100).toFixed(1)}%;background:${CAT_COLORS[r.c]||"#888"}"></div></div>
+    </div>`).join("") : `<div class="empty" style="padding:30px;text-align:center" class="muted">暂无数据</div>`;
+  // 动态表头：全部=库存三列；平台=销售额
+  $("#catThead").innerHTML = isAll
+    ? `<th>品类</th><th class="r">SKU数</th><th class="r">区间销量</th><th class="r">销量占比</th><th class="r">库存(件)</th><th class="r">库存金额(元)</th><th class="r">可售天数</th>`
+    : `<th>品类</th><th class="r">SKU数</th><th class="r">区间销量</th><th class="r">销量占比</th><th class="r">销售额(元)</th>`;
+  $("#catTable tbody").innerHTML = rows.map(r=>`
+    <tr>
+      <td><span class="pill" style="background:${CAT_COLORS[r.c]||"#888"};color:#fff">${r.c}</span></td>
+      <td class="r num">${fmt(r.skus)}</td>
+      <td class="r num"><b>${fmt(r.s30)}</b></td>
+      <td class="r num">${r.share.toFixed(1)}%<div class="bar-wrap" style="margin-top:3px;height:7px"><div class="bar" style="width:${Math.min(r.share*2,100).toFixed(1)}%;background:${CAT_COLORS[r.c]||"#888"}"></div></div></td>
+      ${isAll
+        ? `<td class="r num">${fmt(r.stock)}</td>
+           <td class="r num">${money(r.amt)}</td>
+           <td class="r num" style="color:${r.cover==null?"var(--muted)":r.cover>90?"var(--red)":r.cover<14?"var(--red)":"var(--text)"}">${r.cover==null?"—":r.cover.toFixed(0)}</td>`
+        : `<td class="r num">${money(r.amt)}</td>`}
+    </tr>`).join("");
+  $("#catRange").textContent = `${p.range.from} ~ ${p.range.to}（${p.range.days}天）`;
+  const cp = catpf();
+  const exq = cp ? D.catpf.excluded.qty : 0;
+  $("#catFoot").innerHTML = isAll
+    ? `<b>分类口径：</b>按商品名称关键词归类（充电宝/移动电源、充电器/充电头、各类线、壳/套、膜/贴，其余→其他）。<b>已剔除赠品/打包袋/包装袋</b>${cp?`（街顺商品口径剔除 ${fmt(exq)} 件/30天）`:""}。<b>可售天数</b>=品类库存÷品类区间日均销量（库存为实时快照）。当前时间段合计 <b>${fmt(tot)}</b> 件。`
+    : `<b>${catPlat}口径：</b>街顺商品分析（${p.range.from}~${p.range.to}），已剔除赠品/打包袋。合计 <b>${fmt(tot)}</b> 件 / ${money(totGmv)}。库存为实时快照、无法按平台拆分。`;
+}
+
+/* ---------- 11月绩效 ---------- */
+const TGT = {
+  "淘宝闪购": {label:"淘宝闪购", dO:20, mO:600,  dG:2000, mG:60000},
+  "京东":     {label:"京东秒杀", dO:24, mO:720,  dG:2400, mG:72000},
+  "美团":     {label:"美团闪购", dO:66, mO:1980, dG:6600, mG:198000},
+};
+const PCOLOR = {"淘宝闪购":"#ff5000", "京东":"#c0392b", "美团":"#ff8a00"};
+const MDAYS = 30;                       // 目标口径：日均 × 30 = 月目标
+function perfCfg(){ return D.perf || {}; }
+function perfRows(){
+  const PF = perfCfg(), days = PF.days || 0;
+  return Object.keys(TGT).map(k=>{
+    const t = TGT[k], m = ((PF.monthly||{})[k]) || {orders:0, gmv:0};
+    const rest = Math.max(MDAYS - days, 0);
+    const oAvg = days ? m.orders/days : 0, gAvg = days ? m.gmv/days : 0;
+    const oProg = t.mO ? m.orders/t.mO : 0, gProg = t.mG ? m.gmv/t.mG : 0;
+    return {
+      k, t, label: t.label, orders: m.orders, gmv: m.gmv, days, rest,
+      oAvg, gAvg, oProg, gProg,
+      fOrders: oAvg*MDAYS, fGmv: gAvg*MDAYS,
+      fOProg: t.mO ? oAvg*MDAYS/t.mO : 0, fGProg: t.mG ? gAvg*MDAYS/t.mG : 0,
+      needO: rest ? Math.max((t.mO - m.orders)/rest, 0) : 0,
+      needG: rest ? Math.max((t.mG - m.gmv)/rest, 0) : 0,
+      dueO: t.mO*days/MDAYS, dueG: t.mG*days/MDAYS,          // 按时间进度应达
+      gapO: m.orders - t.mO*days/MDAYS, gapG: m.gmv - t.mG*days/MDAYS,
+    };
+  });
+}
+function perfState(r){
+  if(!r.days) return {txt:"无数据", cls:"b"};
+  const lo = Math.min(r.fOProg, r.fGProg);
+  if(lo >= 1) return {txt:"达标在望", cls:"g"};
+  if(lo >= 0.8) return {txt:"接近达标", cls:"o"};
+  return {txt:"需提速", cls:"r"};
+}
+function barHTML(p, timeP){
+  const w = Math.min(p*100, 100);
+  const col = p>=1 ? "var(--green)" : p>=timeP ? "var(--brand)" : "var(--red)";
+  return `<div class="goalbar"><i style="width:${w.toFixed(1)}%;background:${col}"></i>
+    <b style="left:${Math.min(timeP*100,99).toFixed(1)}%"></b></div>`;
+}
+function renderPerf(){
+  const PF = perfCfg(), rows = perfRows();
+  const days = PF.days || 0, timeP = days/MDAYS;
+  $("#perfRange").textContent = PF.from ? `${PF.from} ~ ${PF.to}（${days} 天 · 目标为 11 月固定值）` : "暂无绩效数据";
+  if(!PF.from){
+    $("#perfCards").innerHTML = '<div class="kpi"><div class="lab">暂无绩效数据</div></div>';
+    return;
+  }
+
+  /* 汇总卡片 */
+  const mO = Object.values(TGT).reduce((s,t)=>s+t.mO,0), mG = Object.values(TGT).reduce((s,t)=>s+t.mG,0);
+  const aO = rows.reduce((s,r)=>s+r.orders,0), aG = rows.reduce((s,r)=>s+r.gmv,0);
+  const fG = rows.reduce((s,r)=>s+r.fGmv,0), fO = rows.reduce((s,r)=>s+r.fOrders,0);
+  const dTgt = Object.values(TGT).reduce((s,t)=>s+t.dO,0);
+  const cards = [
+    {lab:"11月订单目标", val:fmt(mO)+" 单", foot:`已完成 ${fmt(aO)} 单 · 进度 ${pct(aO,mO).toFixed(1)}% (时间进度 ${(timeP*100).toFixed(1)}%)`, cls:"", },
+    {lab:"11月交易额目标", val:money(mG), foot:`已完成 ${money(aG)} · 进度 ${pct(aG,mG).toFixed(1)}%`, cls:""},
+    {lab:"剩余时间", val:`${Math.max(MDAYS-days,0)} 天`, foot:`已过 ${days}/${MDAYS} 天 · 剩余需日均 ${fmt(Math.max((mO-aO)/Math.max(MDAYS-days,1),0))} 单 / ${money(Math.max((mG-aG)/Math.max(MDAYS-days,1),0))}`, cls:"blue"},
+    {lab:"预计月底完成率", val:(pct(fO,mO)).toFixed(1)+"%" + " / " + (pct(fG,mG)).toFixed(1)+"%", foot:`预计订单 ${fmt(fO)} 单 · 交易额 ${money(fG)}`, cls: Math.min(pct(fO,mO),pct(fG,mG))>=100?"green":"red"},
+  ];
+  $("#perfCards").innerHTML = cards.map(c=>`<div class="kpi ${c.cls}"><div class="lab">${c.lab}</div><div class="val">${c.val}</div><div class="foot">${c.foot}</div></div>`).join("");
+
+  /* 主表 */
+  $("#perfTable tbody").innerHTML = rows.map(r=>{
+    const st = perfState(r);
+    const cls = v => v>=1 ? "ok" : v>=timeP ? "" : "bad";
+    return `<tr>
+      <td><b>${r.label}</b></td>
+      <td class="r num">${r.t.dO}</td>
+      <td class="r num">${fmt(r.t.mO)}</td>
+      <td class="r num">${money(r.t.dG)}</td>
+      <td class="r num">${money(r.t.mG)}</td>
+      <td class="r num"><b>${fmt(r.orders)}</b><div class="muted" style="font-size:11px">日均 ${r.oAvg.toFixed(1)}</div></td>
+      <td class="r num"><b>${money(r.gmv)}</b><div class="muted" style="font-size:11px">日均 ${money(r.gAvg)}</div></td>
+      <td class="r num ${cls(r.oProg)}">${(r.oProg*100).toFixed(1)}%${barHTML(r.oProg,timeP)}</td>
+      <td class="r num ${cls(r.gProg)}">${(r.gProg*100).toFixed(1)}%${barHTML(r.gProg,timeP)}</td>
+      <td class="r num muted">${(timeP*100).toFixed(1)}%</td>
+      <td class="r num muted">${Math.round(r.dueO)} 单<br><span style="font-size:11px">${money(r.dueG)}</span></td>
+      <td class="r num ${r.gapO>=0?"ok":"bad"}">${r.gapO>=0?"+":""}${Math.round(r.gapO)} 单<br><span style="font-size:11px">${r.gapG>=0?"+":"−"}${money(Math.abs(r.gapG))}</span></td>
+      <td class="r num">${fmt(r.fOrders)}<div class="muted" style="font-size:11px">${(r.fOProg*100).toFixed(1)}%</div></td>
+      <td class="r num">${money(r.fGmv)}<div class="muted" style="font-size:11px">${(r.fGProg*100).toFixed(1)}%</div></td>
+      <td class="r num">${fmt(r.needO)} 单<br><span class="muted" style="font-size:11px">${money(r.needG)}</span></td>
+      <td><span class="lvl ${st.cls}">${st.txt}</span></td>
+    </tr>`;
+  }).join("") + `<tr style="background:#faf8f4;font-weight:600">
+      <td>合计</td><td class="r num">${dTgt}</td><td class="r num">${fmt(mO)}</td>
+      <td class="r num">${money(Object.values(TGT).reduce((s,t)=>s+t.dG,0))}</td><td class="r num">${money(mG)}</td>
+      <td class="r num">${fmt(aO)}</td><td class="r num">${money(aG)}</td>
+      <td class="r num">${pct(aO,mO).toFixed(1)}%</td><td class="r num">${pct(aG,mG).toFixed(1)}%</td>
+      <td class="r num">${(timeP*100).toFixed(1)}%</td>
+      <td class="r num muted">${Math.round(mO*days/MDAYS)} 单<br><span style="font-size:11px">${money(mG*days/MDAYS)}</span></td>
+      <td class="r num ${aO-mO*days/MDAYS>=0?"ok":"bad"}">${aO-mO*days/MDAYS>=0?"+":""}${Math.round(aO-mO*days/MDAYS)} 单<br><span style="font-size:11px">${aG-mG*days/MDAYS>=0?"+":"−"}${money(Math.abs(aG-mG*days/MDAYS))}</span></td>
+      <td class="r num">${fmt(fO)}</td><td class="r num">${money(fG)}</td><td class="r num">—</td><td>—</td></tr>`;
+
+  /* 每日订单：堆叠柱 + 日目标线 */
+  const dates = PF.dates || [], n = dates.length || 1;
+  const tot = dates.map((_,i)=>Object.keys(TGT).reduce((s,k)=>s+(((PF.platforms||{})[k]||{o:[]}).o[i]||0),0));
+  const maxDay = Math.max(...tot, dTgt)*1.18 || 1;
+  const W=680, H=250, PD={l:38,r:10,t:12,b:26};
+  const bw = (W-PD.l-PD.r)/n*0.62, gap = (W-PD.l-PD.r)/n;
+  const y = v => H-PD.b - v/maxDay*(H-PD.t-PD.b);
+  let bars="", ylab="";
+  for(let g=0; g<=4; g++){ const v=maxDay/4*g, yy=y(v);
+    ylab+=`<line x1="${PD.l}" y1="${yy}" x2="${W-PD.r}" y2="${yy}" stroke="#efe9df"/><text x="${PD.l-5}" y="${yy+3.5}" font-size="9.5" fill="#8a8272" text-anchor="end">${Math.round(v)}</text>`; }
+  dates.forEach((d,i)=>{
+    let acc=0;
+    Object.keys(TGT).forEach(k=>{
+      const v = ((PF.platforms||{})[k]||{o:[]}).o[i]||0; if(!v) return;
+      const x = PD.l + gap*i + (gap-bw)/2;
+      const h = v/maxDay*(H-PD.t-PD.b);
+      bars += `<rect x="${x.toFixed(1)}" y="${(y(acc+v)).toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" fill="${PCOLOR[k]}" rx="1"/>`;
+      acc += v;
+    });
+    bars += `<text x="${(PD.l+gap*i+gap/2).toFixed(1)}" y="${H-9}" font-size="9.5" fill="#8a8272" text-anchor="middle">${d.slice(8)}</text>`;
+  });
+  const ty = y(dTgt);
+  $("#perfDailyChart").innerHTML = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto">${ylab}
+    ${bars}
+    <line x1="${PD.l}" y1="${ty.toFixed(1)}" x2="${W-PD.r}" y2="${ty.toFixed(1)}" stroke="#2b2620" stroke-width="1.2" stroke-dasharray="5 4"/>
+    <text x="${W-PD.r-2}" y="${(ty-5).toFixed(1)}" font-size="10" fill="#2b2620" text-anchor="end">日目标 ${dTgt} 单</text>
+  </svg>
+  <div class="legend" style="margin-top:4px">${Object.keys(TGT).map(k=>`<span><i style="background:${PCOLOR[k]}"></i>${TGT[k].label}</span>`).join("")}</div>`;
+
+  /* 累计 vs 目标 */
+  let cum=0; const cumArr = tot.map(v => (cum+=v));
+  const maxCum = Math.max(cumArr[cumArr.length-1]||0, dTgt*n)*1.12 || 1;
+  const W2=680, H2=250, PD2={l:44,r:12,t:12,b:26};
+  const xw = (W2-PD2.l-PD2.r)/Math.max(n-1,1);
+  const y2 = v => H2-PD2.b - v/maxCum*(H2-PD2.t-PD2.b);
+  let g2="";
+  for(let g=0; g<=4; g++){ const v=maxCum/4*g, yy=y2(v);
+    g2+=`<line x1="${PD2.l}" y1="${yy}" x2="${W2-PD2.r}" y2="${yy}" stroke="#efe9df"/><text x="${PD2.l-5}" y="${yy+3.5}" font-size="9.5" fill="#8a8272" text-anchor="end">${Math.round(v)}</text>`; }
+  const linePath = arr => arr.map((v,i)=>`${i?"L":"M"}${(PD2.l+i*xw).toFixed(1)},${y2(v).toFixed(1)}`).join("");
+  const tgtArr = dates.map((_,i)=>dTgt*(i+1));
+  const gaps = cumArr.map((v,i)=>v-tgtArr[i]);
+  const lastGap = gaps[gaps.length-1]||0;
+  $("#perfCumChart").innerHTML = `<svg viewBox="0 0 ${W2} ${H2}" style="width:100%;height:auto">${g2}
+    <path d="${linePath(tgtArr)}" fill="none" stroke="#2b2620" stroke-width="1.2" stroke-dasharray="5 4"/>
+    <path d="${linePath(cumArr)}" fill="none" stroke="var(--brand)" stroke-width="2.5"/>
+    <circle cx="${(PD2.l+(n-1)*xw).toFixed(1)}" cy="${y2(cumArr[n-1]||0).toFixed(1)}" r="3.5" fill="var(--brand)"/>
+  </svg>
+  <div style="display:flex;gap:16px;font-size:12px;color:var(--muted);margin-top:2px">
+    <span>累计完成 <b style="color:var(--text)">${fmt(cumArr[n-1]||0)} 单</b></span>
+    <span>应达 ${fmt(tgtArr[n-1]||0)} 单</span>
+    <span style="color:${lastGap>=0?"var(--green)":"var(--red)"}">${lastGap>=0?"领先":"落后"} ${fmt(Math.abs(lastGap))} 单</span></div>`;
+
+  /* 每日明细 */
+  $("#perfDayTable tbody").innerHTML = dates.map((d,i)=>{
+    const o = k => (((PF.platforms||{})[k]||{o:[]}).o[i]||0);
+    const g = k => (((PF.platforms||{})[k]||{g:[]}).g[i]||0);
+    const tt = tot[i], rate = dTgt ? tt/dTgt*100 : 0;
+    const cls = rate>=100 ? "ok" : rate>=70 ? "" : "bad";
+    return `<tr>
+      <td>${d.slice(5)}</td>
+      <td class="r num">${o("淘宝闪购")}</td><td class="r num">${money(g("淘宝闪购"))}</td>
+      <td class="r num">${o("京东")}</td><td class="r num">${money(g("京东"))}</td>
+      <td class="r num">${o("美团")}</td><td class="r num">${money(g("美团"))}</td>
+      <td class="r num"><b>${fmt(tt)}</b></td>
+      <td class="r num">${money(Object.keys(TGT).reduce((s,k)=>s+g(k),0))}</td>
+      <td class="r num ${cls}">${rate.toFixed(0)}%</td>
+    </tr>`;
+  }).join("");
+
+  $("#perfFoot").innerHTML = `<b>目标口径：</b>11 月固定目标（日均订单 × 30 = 月订单目标，日均交易额 × 30 = 月交易额目标）。<b>实际数据：</b>街顺平台接口 <code>platformSaleData</code>，取「有效订单数」与「交易额」，云南 + 广西 17 店合计，统计区间 <b>${PF.from} ~ ${PF.to}</b>（${days} 个完整日，不含今日）。<br>
+  <b>时间进度</b> = 已过天数 ÷ 30 = <b>${(timeP*100).toFixed(1)}%</b>；<b>按进度应达</b> = 月目标 × 已过天数 ÷ 30；<b>差距</b> = 已完成 − 应达（正数为领先）；<b>预计月底完成率</b> = 当前日均 × 30 ÷ 月目标（按当前速度线性外推）；<b>剩余日均需达成</b> = (月目标 − 已完成) ÷ 剩余天数；进度条上的<b>竖线</b>即时间进度位置，柱子在竖线右侧为跑赢时间进度。`;
+}
+
+/* ---------- 导出 ---------- */
+function exportCSV(kind){
+  const p = curP();
+  const head = (p, extra) => [p, ...extra];
+  let rows = [], header = [];
+  if(kind==="store"){
+    const platTag = (storePlat!=="全部" && !CP) ? `·${storePlat==="淘宝闪购"?"淘闪":storePlat}` : "";
+    header = ["门店","主体","城市",`GMV(${p.label}${platTag})`,"订单数","库存(件)","库存金额(元)","30天销量","日均","整体周转(天)","状态"];
+    rows = storeRows().map(r=>[r.st.name,r.st.vendor,r.st.city,Math.round(r.gmv),r.orders,r.g.stock,
+      Math.round(r.g.amt),r.g.s30,storeDaily(r.g).toFixed(2),r.cover==null?"":r.cover.toFixed(1),r.lv]);
+  } else if(kind==="mov"){
+    const p = curP(), lvF = $("#movLevel").value, kw = ($("#movSearch").value||"").toLowerCase();
+    if(movPlat==="全部"){
+      header = ["SKU","商品名称","近3天","近7天","近14天",`区间销量(${p.range.days}天)`,"日均","库存","可售天数","等级","动销门店数","零售价"];
+      rows = movRows().filter(r=>!lvF||r.lv===lvF)
+        .filter(r=>!kw||r.name.toLowerCase().includes(kw)||r.sku.toLowerCase().includes(kw))
+        .sort((a,b)=>b.s30-a.s30)
+        .map(r=>[r.sku,r.name,r.q3,r.s7,r.s14,r.s30,(r.dag||0).toFixed(2),r.stock,
+          r.cover==null?"":r.cover.toFixed(1),r.lv,r.stores,r.price]);
+    }else{
+      header = ["平台","SKU","商品名称",`区间销量(${p.range.days}天)`,"日均","销售额(元)","动销门店数"];
+      rows = (movPlatRows()||[])
+        .filter(r=>!kw||r.name.toLowerCase().includes(kw)||r.sku.toLowerCase().includes(kw))
+        .sort((a,b)=>b.s30-a.s30)
+        .map(r=>[movPlat,r.sku,r.name,r.s30,r.dag.toFixed(1),Math.round(r.amt),r.stores]);
+    }
+  } else if(kind==="turn"){
+    header = ["门店","主体","城市","库存(件)","库存金额(元)","30天销量","日均","整体周转(天)","状态"];
+    rows = storeRows().map(r=>[r.st.name,r.st.vendor,r.st.city,r.g.stock,Math.round(r.g.amt),
+      r.g.s30,storeDaily(r.g).toFixed(2),r.cover==null?"":r.cover.toFixed(1),r.lv]);
+  } else if(kind==="rst"){
+    header = ["门店","UPC","SKU ID","商品名称","近3天","近7天","近14天","30天销量","日均","库存","可售天数","状态","建议补货","建议动作"];
+    const lvF = $("#rstLevel").value, kw = ($("#rstSearch").value||"").toLowerCase();
+    const f = x => lvF==="need"?x.a.restock>0:lvF==="urgent"?["售罄·立即补","紧急补货"].includes(x.a.state)
+      :lvF==="over"?x.a.state==="压货":lvF==="dead"?x.a.state==="死库存":true;
+    rows = restockRows().filter(f)
+      .filter(x=>!kw||x.st.name.toLowerCase().includes(kw)||x.r.name.toLowerCase().includes(kw)
+        ||(x.r.upc||"").includes(kw)||(x.r.sku||"").toLowerCase().includes(kw))
+      .sort((a,b)=>(ORDER[a.a.state]??9)-(ORDER[b.a.state]??9))
+      .map(x=>[x.st.name,x.r.upc||"",x.r.sku,x.r.name,x.r.q3,x.r.s7,x.r.s14,x.r.s30,dailyOf(x.r).toFixed(2),
+        x.r.stock,x.a.cover==null?"":x.a.cover.toFixed(1),x.a.state,x.a.restock,x.a.action]);
+  } else if(kind==="cat"){
+    const p = curP();
+    if(catPlat==="全部"){
+      header = ["品类","SKU数",`区间销量(${p.range.days}天)`,"销量占比(%)","销售额(元)","库存(件)","库存金额(元)","可售天数"];
+      rows = catRows().map(r=>[r.c,r.skus,r.s30,r.share.toFixed(1),Math.round(r.gmv||0),r.stock,Math.round(r.amt),
+        r.cover==null?"":r.cover.toFixed(1)]);
+    }else{
+      header = ["平台","品类","SKU数",`区间销量(${p.range.days}天)`,"销量占比(%)","销售额(元)"];
+      rows = (catRowsPlat()||[]).map(r=>[catPlat,r.c,r.skus,r.s30,r.share.toFixed(1),Math.round(r.amt)]);
+    }
+  } else if(kind==="perf"){
+    const tp = (perfCfg().days||0)/MDAYS;
+    header = ["平台","月订单目标","已完成订单","订单完成进度(%)","月交易额目标","已完成交易额","交易额完成进度(%)",
+      "时间进度(%)","按进度应达订单","订单差距","按进度应达交易额","交易额差距",
+      "预计月底订单","预计订单完成率(%)","预计月底交易额","预计交易额完成率(%)","剩余日均需订单","剩余日均需交易额","状态"];
+    rows = perfRows().map(r=>[r.label,r.t.mO,r.orders,(r.oProg*100).toFixed(1),r.t.mG,Math.round(r.gmv),
+      (r.gProg*100).toFixed(1),(tp*100).toFixed(1),Math.round(r.dueO),Math.round(r.gapO),Math.round(r.dueG),Math.round(r.gapG),
+      Math.round(r.fOrders),(r.fOProg*100).toFixed(1),Math.round(r.fGmv),(r.fGProg*100).toFixed(1),
+      Math.ceil(r.needO),Math.round(r.needG),perfState(r).txt]);
+  } else if(kind==="cw"){
+    const pvF = $("#cwProv").value||"", gvF = $("#cwGrade").value||"", kw = ($("#cwSearch").value||"").toLowerCase(), onlyIn = $("#cwInStock").checked;
+    const data = cwRows(), GR = {S:0,A:1,B:2};
+    header = ["省份","等级","SKU ID","商品全名","规格名称","分类","省内30天销量","销量占比(%)","累计占比(%)","覆盖门店数","省内在仓","日均","中心仓建议"];
+    rows = Object.keys(CW_PROV).filter(pv=>!pvF||pv===pvF).flatMap(pv=>data[pv].rows.map(r=>({...r, prov:pv})))
+      .filter(r=>(!gvF||r.grade===gvF)&&(!onlyIn||r.stock>0))
+      .filter(r=>!kw||r.name.toLowerCase().includes(kw)||r.sku.toLowerCase().includes(kw)||(r.spec||"").toLowerCase().includes(kw))
+      .sort((a,b)=>GR[a.grade]-GR[b.grade]||b.s30-a.s30)
+      .map(r=>[r.prov,r.grade,r.sku,r.name,r.spec||"",r.cat,r.s30,(r.share*100).toFixed(1),(r.cum*100).toFixed(1),r.stores,r.stock,r.dag.toFixed(1),
+        r.grade==="B"?"B级·调拨/退仓评估":r.grade+"级·入仓摆放"]);
+  }
+  const csv = "\ufeff" + [header, ...rows].map(r=>r.map(v=>{
+    const s = String(v==null?"":v);
+    return /[",\n]/.test(s) ? '"'+s.replace(/"/g,'""')+'"' : s;
+  }).join(",")).join("\r\n");
+  const d = new Date(), pad = n=>String(n).padStart(2,"0");
+  const stamp = `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}`;
+  const catTag = kind==="cat" && catPlat!=="全部" ? `品类-${catPlat}` :
+                 (kind==="mov" && movPlat!=="全部" ? `动销-${movPlat}` : null);
+  const name = `出其不意经营看板_${kind==="perf"?"11月绩效":kind==="cw"?"中心仓":catTag||p.label}_${stamp}.csv`;
+  const blob = new Blob([csv], {type:"text/csv;charset=utf-8;"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = name; a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+/* ---------- 中心仓 ---------- */
+let cwCache = null;
+const CW_PROV = { "云南": {area:"云南全省 · 昆明区", hub:"昆明仓（筹建中）"},
+                  "广西": {area:"广西全省 · 南宁/柳州/桂林区", hub:"南宁仓（筹建中）"} };
+function cwRows(){
+  if(cwCache) return cwCache;
+  const out = {};
+  Object.keys(CW_PROV).forEach(pv => {
+    const sts = M.stores.filter(s => s.vendor === pv);
+    const agg = {};
+    sts.forEach(st => {
+      const g = SD[st.id]; if(!g) return;
+      g.skus.forEach(k => {
+        if(catIsEx(k[1])) return;
+        const o = agg[k[0]] || (agg[k[0]] = {sku:k[0], name:k[1], stock:0, s30:0, s7:0, s14:0, q3:0, dag:0, stores:0, price:k[8], cat:(SK[k[0]]||{}).cat||"其他", spec:(SK[k[0]]||{}).spec||""});
+        o.stock += k[2]; o.s30 += k[6]; o.s7 += k[4]; o.s14 += k[5]; o.q3 += (k[11]||0); o.dag += k[7]; o.stores += 1;
+      });
+    });
+    const rows = Object.values(agg);
+    const tot = rows.reduce((s,r)=>s+r.s30, 0);
+    rows.sort((a,b)=>b.s30-a.s30);
+    let cum = 0, cnt = {S:0, A:0, B:0};
+    rows.forEach(r => {
+      const prev = cum;
+      cum += tot > 0 ? r.s30/tot : 0;
+      r.prev = prev; r.cum = Math.min(cum,1); r.share = tot > 0 ? r.s30/tot : 0;
+      if(r.s30 <= 0) r.grade = "B";                       // 零动销一律 B
+      else r.grade = prev < 0.5 ? "S" : (prev < 0.7 ? "A" : "B");
+      cnt[r.grade] += 1;
+    });
+    out[pv] = {rows, tot, stores: sts.length, cnt};
+  });
+  cwCache = out; return out;
+}
+function cwSuggest(r){
+  if(r.grade === "B") return '<span class="pill gray">B级 · 调拨/退仓评估</span>';
+  return `<span class="pill ${r.grade==="S"?"green":"blue"}">${r.grade}级 · 入仓摆放</span>`;
+}
+function renderCwhub(){
+  const data = cwRows(), prov = $("#cwProv").value || "", gv = $("#cwGrade").value || "";
+  // 两省中心仓卡片
+  $("#cwCards").innerHTML = Object.keys(CW_PROV).map(pv => {
+    const d = data[pv], cfg = CW_PROV[pv];
+    const sa = d.rows.filter(r=>r.grade!=="B");
+    const saStock = sa.reduce((s,r)=>s+r.stock,0);
+    const bRows = d.rows.filter(r=>r.grade==="B");
+    const bStock = bRows.reduce((s,r)=>s+r.stock,0);
+    const bDead = bRows.filter(r=>r.s30===0).reduce((s,r)=>s+r.stock,0);
+    const dagProv = d.tot/30;
+    const covDays = dagProv>0 ? saStock/dagProv : null;
+    const amt = d.rows.reduce((s,r)=>s+r.stock*(r.price||0),0);
+    return `<div class="section">
+      <div class="section-head"><h2>${pv}中心仓 <span class="pill yellow" style="margin-left:6px">规划中</span></h2></div>
+      <div style="font-size:12.5px;color:var(--muted);line-height:2">
+        <div style="display:flex;justify-content:space-between"><span>服务区域</span><b style="color:var(--text)">${cfg.area}</b></div>
+        <div style="display:flex;justify-content:space-between"><span>覆盖门店</span><b style="color:var(--text)">${d.stores} 家（紧急补货半径内）</b></div>
+        <div style="display:flex;justify-content:space-between"><span>S / A / B 级 SKU</span><b style="color:var(--text)">${d.cnt.S} / ${d.cnt.A} / ${d.cnt.B}</b></div>
+        <div style="display:flex;justify-content:space-between"><span>建议入仓（S+A）</span><b style="color:var(--green)">${sa.length} SKU · ${fmt(saStock)} 件</b></div>
+        <div style="display:flex;justify-content:space-between"><span>建议调拨/退仓（B）</span><b style="color:var(--orange)">${bRows.length} SKU · ${fmt(bStock)} 件（含零动销 ${fmt(bDead)} 件）</b></div>
+        <div style="display:flex;justify-content:space-between"><span>省内近30天动销</span><b style="color:var(--text)">${fmt(d.tot)} 件 · 日均 ${dagProv.toFixed(1)} 件</b></div>
+        <div style="display:flex;justify-content:space-between"><span>入仓口径周转</span><b style="color:var(--text)">${covDays==null?"—":covDays.toFixed(1)+" 天"} · 在仓货值 ${money(amt)}</b></div>
+      </div>
+    </div>`;
+  }).join("");
+  // 明细表
+  const kw = ($("#cwSearch").value||"").toLowerCase(), onlyIn = $("#cwInStock").checked;
+  const GR = {S:0, A:1, B:2};
+  let list = Object.keys(CW_PROV).filter(pv=>!prov||pv===prov).flatMap(pv =>
+    data[pv].rows.map(r=>({...r, prov:pv})));
+  list = list.filter(r=>(!gv||r.grade===gv) && (!onlyIn||r.stock>0))
+    .filter(r=>!kw||r.name.toLowerCase().includes(kw)||r.sku.toLowerCase().includes(kw)||(r.spec||"").toLowerCase().includes(kw))
+    .sort((a,b)=>GR[a.grade]-GR[b.grade]||b.s30-a.s30);
+  const show = list.slice(0,400);
+  const GCLS = {S:"green", A:"blue", B:"gray"};
+  $("#cwTable tbody").innerHTML = show.length ? show.map((r,i)=>`
+    <tr>
+      <td class="num muted">${i+1}</td>
+      <td>${r.prov}</td>
+      <td><span class="pill ${GCLS[r.grade]}">${r.grade} 级</span></td>
+      <td class="num skucode">${r.sku||"<span class='muted'>—</span>"}</td>
+      <td class="sku-name" title="${r.name}">${r.name}</td>
+      <td class="muted" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.spec||""}">${r.spec||"<span class='muted'>—</span>"}</td>
+      <td>${r.cat}</td>
+      <td class="r num"><b>${fmt(r.s30)}</b></td>
+      <td class="r num">${(r.share*100).toFixed(1)}%</td>
+      <td class="r num">${(r.cum*100).toFixed(1)}%</td>
+      <td class="r num">${r.stores}</td>
+      <td class="r num">${fmt(r.stock)}</td>
+      <td class="r num">${r.dag.toFixed(1)}</td>
+      <td>${cwSuggest(r)}</td>
+    </tr>`).join("") : `<tr><td colspan="14" class="empty">没有符合条件的数据</td></tr>`;
+  $("#cwFoot").innerHTML = `共 <b>${fmt(list.length)}</b> 条${list.length>400?"，显示前 400 条（S→A→B，同级别销量降序），导出 CSV 可拿完整清单":""}。分级口径：省内近 30 天销量（街顺快照 ${M.jsDate}）· S=前50% / A=50~70% / B=尾部30%（零动销归 B）。`;
+  $("#cwTip").textContent = "S/A 级建议入中心仓摆放（服务紧急补货）· B 级建议调拨回中心仓做退仓/调拨处理";
+}
+
+function renderAll(){
+  renderKpis();
+  if(curTab==="overview"){ renderTrend(); renderChannel(); renderStoreTable(); }
+  if(curTab==="movement"){ renderMovDist(); renderMovTable(); }
+  if(curTab==="turnover"){ renderBuckets(); renderTurnTable(); }
+  if(curTab==="restock"){ renderRestockTable(); }
+  if(curTab==="category"){ renderCategory(); }
+  if(curTab==="perf"){ renderPerf(); }
+  if(curTab==="cwhub"){ renderCwhub(); }
+  const p = curP();
+  $("#subTitle").textContent = `数据区间 ${p.range.from} ~ ${p.range.to}（${p.range.days} ${CP?"天":"个完整日"}） · ${M.stores.length} 家门店 · 库存/销量为街顺实时快照（采集于 ${M.jsDate}）`;
+}
+function boot(){
+  if(!window.D){ $("#kpis").innerHTML='<div class="kpi"><div class="lab">未找到数据</div></div>'; return; }
+  $("#jsTime").textContent = M.jsDate;
+  $("#footNote").innerHTML = `<b>数据来源：</b>库存、近7/14/30天销量、日均销量、上下架状态 = <b>街顺 API 门店商品接口</b>；近3天、GMV、订单、渠道、趋势 = 星火 ERP（近3天为实际出库）。原始口径备注：（实时快照，采集于 ${M.jsDate}，${M.stores.length} 家门店 / ${fmt(M.skuN)} 条店-SKU）；GMV、订单数、渠道、趋势 = <b>星火 ERP 经营接口</b>（所选时间段）。<br>
+  <b>周转口径：</b>可售天数 = 当前库存 ÷ 日均销量（可在顶部切换「街顺日均」或「近30天销量÷30」）；日均=0 的 SKU 不参与周转、归入死库存。<br>
+  <b>剔除口径：</b>赠品 / 打包袋 / 包装袋不计入库存件数、库存金额、周转与补货（本版共剔除 ${M.excluded?fmt(M.excluded.qty)+" 件 / "+money(M.excluded.amt):"—"}）。<br>
+  <b>说明：</b>时间段切换影响经营指标（GMV/订单/趋势/渠道），库存与周转为实时快照、不随时间段变化。`;
+  initFilters(); syncPeriodChips(); renderAll();
+}
+/* ---- 登录门 ---- */
+const AUTH_HASH = "abbc6b79c4a9428a26840dbcea778252a56ca61f8cbd0a36aecc49224d44b9be";
+const AUTH_KEY = "cyby_auth_v1";
+async function sha256Hex(s){
+  const b = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
+  return [...new Uint8Array(b)].map(x => x.toString(16).padStart(2,"0")).join("");
+}
+(async function authGate(){
+  const gate = $("#loginGate");
+  if(sessionStorage.getItem(AUTH_KEY) === "1"){ boot(); return; }
+  document.body.classList.add("locked");
+  gate.style.display = "flex";
+  const go = async () => {
+    const u = $("#lgUser").value.trim(), p = $("#lgPass").value;
+    if(!u || !p){ $("#lgErr").textContent = "请输入账号和密码"; return; }
+    let h = "";
+    try { h = await sha256Hex(u + ":" + p); } catch(e){ $("#lgErr").textContent = "当前环境不支持校验，请用 https 链接访问"; return; }
+    if(h === AUTH_HASH){
+      sessionStorage.setItem(AUTH_KEY, "1");
+      gate.style.display = "none";
+      document.body.classList.remove("locked");
+      boot();
+    } else {
+      $("#lgErr").textContent = "账号或密码错误，请重试";
+      $("#lgPass").value = "";
+    }
+  };
+  $("#lgBtn").onclick = go;
+  $("#lgUser").addEventListener("keydown", e => { if(e.key === "Enter") $("#lgPass").focus(); });
+  $("#lgPass").addEventListener("keydown", e => { if(e.key === "Enter") go(); });
+})();
+</script>
+</body>
+</html>
