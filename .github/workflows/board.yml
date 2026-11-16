@@ -20,6 +20,8 @@ jobs:
   build-deploy:
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    env:
+      TZ: Asia/Shanghai   # 采集时间戳用北京时间
     steps:
       - uses: actions/checkout@v4
 
