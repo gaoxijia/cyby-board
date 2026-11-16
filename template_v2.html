@@ -199,7 +199,7 @@ body.locked > .wrap{display:none}
       <div id="trendChart"></div>
     </div>
     <div class="section">
-      <div class="section-head"><h2>渠道结构 <span class="tip">销售额 + 订单为 ERP 全区口径；推广费 / 广告成交 / 费率比 为各平台广告后台口径（费率比 = 推广费 ÷ 广告成交额）</span></h2></div>
+      <div class="section-head"><h2>渠道结构 <span class="tip">销售额 + 订单为 ERP 全区口径；推广费为各平台广告后台口径；费率比 = 推广费 ÷ 该渠道全站交易额（ERP）</span></h2></div>
       <div id="channelChart"></div>
       <h2 style="margin-top:14px">主体概览</h2>
       <div id="partnerCards"></div>
@@ -743,7 +743,7 @@ function renderChannel(){
   // 推广费：各平台广告后台口径，自定义区间无对应数据 → 仅预设周期展示
   const AD = (!CP && D.ad && D.ad.periods) ? (D.ad.periods[P] || null) : null;
   const adP = (AD && AD.platforms) || {};
-  const adCol = r => r==null ? "var(--muted)" : (r>=40?"var(--red)":(r>=25?"var(--orange)":"var(--green)"));
+  const adCol = r => r==null ? "var(--muted)" : (r>=20?"var(--red)":(r>=10?"var(--orange)":"var(--green)"));
   const tbLimited = !!(D.ad && D.ad.meta && D.ad.meta.eleme_periods && D.ad.meta.eleme_periods.length && D.ad.meta.eleme_periods.length < 4);
   $("#channelChart").innerHTML = chans.length ? chans.map(c=>{
     const pc = c.gmv/total*100;
@@ -752,10 +752,12 @@ function renderChannel(){
     const a = adP[c.ch];
     const missTxt = !AD ? "（切换至预设周期查看）"
       : (tbLimited && c.ch === "淘宝闪购" ? "（淘闪仅提供近7天/近30天）" : "（该渠道本期无推广数据）");
+    // 费率比 = 推广费 ÷ 该渠道全站交易额（ERP 口径，即上行显示的 GMV），非广告归因成交额
+    const rateL = a && c.gmv ? a.spend/c.gmv*100 : null;
     const adLine = a
       ? `<div style="display:flex;justify-content:space-between;font-size:11.5px;margin-top:2px">
-           <span class="muted">推广费 <b class="num" style="color:var(--text)">${money2(a.spend)}</b> · 广告成交 <b class="num" style="color:var(--text)">${money2(a.trade)}</b></span>
-           <span class="muted">费率比 <b class="num" style="color:${adCol(a.rate)}">${a.rate==null?"—":a.rate.toFixed(1)+"%"}</b></span></div>`
+           <span class="muted">推广费 <b class="num" style="color:var(--text)">${money2(a.spend)}</b></span>
+           <span class="muted">费率比 <b class="num" style="color:${adCol(rateL)}">${rateL==null?"—":rateL.toFixed(1)+"%"}</b></span></div>`
       : `<div class="muted" style="font-size:11.5px;margin-top:2px">推广费 —${missTxt}</div>`;
     return `<div style="margin-bottom:9px">
       <div style="display:flex;justify-content:space-between;font-size:12.5px"><span>${c.ch} <span class="muted">${ordTxt}</span></span><b class="num">${money(c.gmv)} · ${pc.toFixed(1)}%</b></div>
@@ -764,11 +766,13 @@ function renderChannel(){
   }).join("") + (function(){
     const rows = Object.entries(adP);
     const spend = rows.reduce((s,x)=>s+(x[1].spend||0),0);
-    const trade = rows.reduce((s,x)=>s+(x[1].trade||0),0);
-    const rate = trade ? spend/trade*100 : null;
+    const rate = total ? spend/total*100 : null;
     const when = (D.ad && D.ad.generated_at) ? D.ad.generated_at.slice(5,16).replace("T"," ") : "";
     let foot = `<div class="muted" style="font-size:11.5px;margin-top:2px">合计 <b>${fmt(totalOrd)}</b> 单 · 客单 <b>${totalOrd?money(total/totalOrd):"—"}</b>`;
-    if (rate != null) foot += `<span style="margin-left:10px">推广费合计 <b class="num" style="color:var(--text)">${money2(spend)}</b> · 广告成交 <b class="num" style="color:var(--text)">${money2(trade)}</b> · 综合费率 <b class="num" style="color:${adCol(rate)}">${rate.toFixed(1)}%</b></span>`;
+    if (rate != null) foot += `<span style="margin-left:10px">推广费合计 <b class="num" style="color:var(--text)">${money2(spend)}</b> · 综合费率 <b class="num" style="color:${adCol(rate)}">${rate.toFixed(1)}%</b>（÷全站交易额）</span>`;
+    // 有 GMV 但没推广数据的渠道 → 合计里不含它，要说明
+    const noAd = AD ? chans.filter(c=>c.gmv>0 && !adP[c.ch]).map(c=>c.ch) : [];
+    if (noAd.length) foot += `<span style="margin-left:8px">· 费率未含 ${noAd.join("/")}</span>`;
     if (when) {
       // 采集时间超过 1 天 → 标注偏旧
       const gen = (D.ad.generated_at || "").slice(0,10), today = (M.gen || "").slice(0,10);
