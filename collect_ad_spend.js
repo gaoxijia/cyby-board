@@ -146,8 +146,9 @@ async function fetchEleme() {
     const dc = ctxs.filter(c => /doujin-isv-manage/.test(c.origin || ''));
     if (dc.length) {
       const c = dc[dc.length - 1].id;
-      const len = await evIn('document.body.innerText.length', c);
-      if (typeof len === 'number' && len > 300) { cid = c; break; }
+      const txt = await evIn('document.body.innerText', c);
+      // 必须等「推广消费」和「已选时间」都渲染出来；只有头部时读到的是旧数据/trade 有值但 spend 为空
+      if (typeof txt === 'string' && txt.indexOf('推广消费') >= 0 && txt.indexOf('已选时间') >= 0) { cid = c; break; }
     }
   }
   if (!cid) { ws.close(); console.log('  淘闪：内容未加载（可能登录态失效），跳过'); return null; }
@@ -164,18 +165,23 @@ async function fetchEleme() {
   const out = {};
   for (const [tabName, key] of [['过去7天', 'p7'], ['过去30天', 'p30']]) {
     await clickTab(tabName);
-    await new Promise(r => setTimeout(r, 6000));
-    const s = await summary();
-    try {
-      const j = JSON.parse(s);
-      const spend = parseFloat(String(j.spend).replace(/,/g, ''));
-      const trade = parseFloat(String(j.trade).replace(/,/g, ''));
-      if (isFinite(spend) && isFinite(trade)) {
-        out[key] = {spend: r2(spend), trade: r2(trade), rateAd: trade ? r2(spend / trade * 100) : null,
-          src: '淘闪 全站推广+斗金推广', range: {from: j.from, to: j.to}};
-        console.log('  淘闪 ' + tabName + ' ' + (j.from || '') + '~' + (j.to || '') + ' 消费 ' + spend + ' 交易额 ' + trade);
-      }
-    } catch (e) {}
+    let j = null;
+    // 切换周期后轮询等数据刷新（最长 24 秒），避免拿到上一周期的旧值
+    for (let i = 0; i < 12; i++) {
+      await new Promise(r => setTimeout(r, 2000));
+      try {
+        const cand = JSON.parse(await summary());
+        if (cand.spend != null && cand.trade != null) { j = cand; break; }
+      } catch (e) {}
+    }
+    if (!j) { console.log('  淘闪 ' + tabName + ' 未读到推广消费，跳过'); continue; }
+    const spend = parseFloat(String(j.spend).replace(/,/g, ''));
+    const trade = parseFloat(String(j.trade).replace(/,/g, ''));
+    if (isFinite(spend) && isFinite(trade)) {
+      out[key] = {spend: r2(spend), trade: r2(trade), rateAd: trade ? r2(spend / trade * 100) : null,
+        src: '淘闪 全站推广+斗金推广', range: {from: j.from, to: j.to}};
+      console.log('  淘闪 ' + tabName + ' ' + (j.from || '') + '~' + (j.to || '') + ' 消费 ' + spend + ' 交易额 ' + trade);
+    }
   }
   ws.close();
   return Object.keys(out).length ? out : null;
@@ -217,5 +223,15 @@ async function fetchEleme() {
   for (const k of Object.keys(PERIODS)) {
     const p = out.periods[k].platforms;
     console.log('  ' + k + ': ' + Object.keys(p).map(k2 => k2 + ' ¥' + p[k2].spend).join('  '));
+  }
+
+  // --upload：采集完立刻走浏览器网页上传到仓库（一条命令完成，避免自动化在中途被重启打断）
+  if (process.argv.indexOf('--upload') >= 0) {
+    const {spawnSync} = require('child_process');
+    const uploader = path.resolve(__dirname, '..', 'cyby-tools', 'gh_upload.js');
+    if (!fs.existsSync(uploader)) { console.error('上传脚本不存在：' + uploader); process.exit(2); }
+    const r = spawnSync(process.execPath, [uploader, OUT, '--msg', '推广费 ' + iso(today)], {stdio: 'inherit'});
+    if (r.status !== 0) { console.error('上传失败（exit ' + r.status + '）'); process.exit(3); }
+    console.log('采集 + 上传完成，GitHub Actions 将自动重建看板');
   }
 })().catch(e => { console.error('失败：' + e.message); process.exit(1); });
