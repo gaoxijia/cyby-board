@@ -21,7 +21,7 @@ const fs = require('fs');
 const path = require('path');
 
 const CDP = 'http://127.0.0.1:9222';
-const OUT = path.resolve(process.argv[2] || 'ad_spend.json');
+const OUT = path.resolve(process.argv.slice(2).filter(a => a.indexOf('--') !== 0)[0] || 'ad_spend.json');
 
 /* ---------------- 周期推算：与 ERP 口径一致（end = 昨天） ---------------- */
 const pad = n => String(n).padStart(2, '0');
@@ -70,7 +70,7 @@ async function fetchMeituan() {
       '&acctBizType=0&promotionType=1&pageSize=200&pageNum=1&queryType=1';
     const code = "(async function(){var r=await fetch('https://ka.waimai.meituan.com/kepler/datacenter/api/ka/data/v2/history/list'," +
       "{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'" + body + "',credentials:'include'});" +
-      "var j=await r.json(); if(!j||!j.data||!j.data.list) return JSON.stringify({err:(j&&j.msg)||'no-data'});" +
+      "var j; try { j = (r && typeof r.json === 'function') ? await r.json() : JSON.parse(await r.text()); } catch(e){ return JSON.stringify({err:'parse:'+e.message}); } if(!j||!j.data||!j.data.list) return JSON.stringify({err:(j&&j.msg)||'no-data'});" +
       "return JSON.stringify(j.data.list.map(function(x){return {d:x.time,cost:x.cost,amt:x.arrangeOrdAmount};}));})()";
     let part; try { part = JSON.parse(await ev(code)); } catch (e) { part = {err: String(e.message).slice(0, 120)}; }
     if (Array.isArray(part)) { rows = rows.concat(part); console.log('  美团', iso(cur), '~', iso(chunkEnd), part.length, '行'); }
@@ -218,6 +218,12 @@ async function fetchEleme() {
   out.meta.missing = tb ? (out.meta.eleme_periods.length < 4 ? ['淘宝闪购仅覆盖近7天/近30天（推广数据页只提供固定口径）'] : [])
     : ['淘宝闪购（全站推广+斗金推广）需 nr.ele.me 登录后补采'];
 
+  // 安全闸门：少于 2 个平台有数据时，绝不覆盖上次快照（避免抗爬失败把别的平台数据抹掉）
+  const okPlats = Object.keys(out.periods.p7.platforms).filter(k => out.periods.p7.platforms[k].spend > 0);
+  if (okPlats.length < 2) {
+    console.error('数据不足：只有 ' + okPlats.join('/') + ' 采到推广费，保留上次 ad_spend.json，不覆盖不上传');
+    process.exit(2);
+  }
   fs.writeFileSync(OUT, JSON.stringify(out, null, 1));
   console.log('\n已写入 ' + OUT);
   for (const k of Object.keys(PERIODS)) {
