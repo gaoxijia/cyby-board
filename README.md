@@ -11,6 +11,7 @@
 - 手动触发：Actions → board-refresh → Run workflow
 - 退出码 10 = 街顺 access_token 过期（需短信验证码重新登录后更新 Secret）
 - 退出码 20 = ERP 账号密码登录失败
+- ERP BI 接口偶发 HTTP 500（连续 4 次重试仍失败时该轮构建失败、不发布，保留上一版）——2026-11-18 出现过一次，重跑即恢复
 
 ## 推广费 / 费率比（ad_spend.json）
 
