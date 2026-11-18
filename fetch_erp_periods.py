@@ -65,20 +65,54 @@ def base(topic, group, f, t):
             "pageSize": 100, "sortBy": "gmv", "sortOrder": "descending", "risk": "", "topic": topic}
 
 
+# 上次快照兜底：ERP BI 偶发 500（2026-11-18 overview/partner 连续几个小时 500），
+# 不能因为一个子接口挂掉就整轮不发布。
+# 快照来源优先仓库内的 erp_periods.json；没有的话从当前线上页面的 payload 里提取 periods。
+PREV_PATH = os.path.join(OUT_DIR, "erp_periods.json")
+prev = json.load(open(PREV_PATH, encoding="utf-8")) if os.path.exists(PREV_PATH) else {}
+if not prev:
+    try:
+        LIVE = "https://gaoxijia.github.io/cyby-board/index.html"
+        req = urllib.request.Request(LIVE, headers={"User-Agent": "Mozilla/5.0"}, method="GET")
+        with urllib.request.urlopen(req, timeout=60) as r:
+            html = r.read().decode("utf-8", "ignore")
+        marker = "const D = "
+        i = html.find(marker)
+        if i >= 0:
+            payload, _ = json.JSONDecoder().raw_decode(html[i + len(marker):])
+            prev = payload.get("periods") or {}
+            print(f"⚠️ ERP 兜底快照来自当前线上页面（{len(prev)} 个周期）")
+    except Exception as e:
+        print(f"⚠️ 无法读取线上兜底快照: {str(e)[:100]}")
+
 out = {}
 for key, (label, days) in PERIODS.items():
     f = dstr(date(TODAY.year, TODAY.month, 1)) if days is None else dstr(END - timedelta(days=days - 1))
     t = dstr(END)
-    ov = call(base("overview", "partner", f, t))
-    # 门店销售（分页拉全）
-    items, page = [], 1
-    while True:
-        d = call(base("sales", "store", f, t) | {"page": page})
-        tb = d.get("table") or {}
-        items += tb.get("items") or []
-        if page * 100 >= (tb.get("total") or 0):
-            break
-        page += 1
+    try:
+        ov = call(base("overview", "partner", f, t))
+    except Exception as e:
+        old = prev.get(key)
+        if not old:
+            raise
+        ov = old
+        print(f"⚠️ {label} overview 接口不可用（{str(e)[:80]}），沿用上次快照")
+    # 门店销售（分页拉全）；失败同样沿用上次快照
+    if ov is not prev.get(key):
+        try:
+            items, page = [], 1
+            while True:
+                d = call(base("sales", "store", f, t) | {"page": page})
+                tb = d.get("table") or {}
+                items += tb.get("items") or []
+                if page * 100 >= (tb.get("total") or 0):
+                    break
+                page += 1
+        except Exception as e:
+            items = (prev.get(key) or {}).get("storeSales") or []
+            print(f"⚠️ {label} 门店销售接口不可用（{str(e)[:80]}），沿用上次快照")
+    else:
+        items = (prev.get(key) or {}).get("storeSales") or []
     out[key] = {
         "label": label, "range": {"from": f, "to": t,
                                   "days": (date.fromisoformat(t) - date.fromisoformat(f)).days + 1},
