@@ -172,6 +172,18 @@ ad_path = os.path.join(OUT, "ad_spend.json")
 if os.path.exists(ad_path):
     payload["ad"] = json.load(open(ad_path, encoding="utf-8"))
 
+# 逐日库存快照（在售时长）：每日累积；days 与 bySku 数组对齐，值为当天有库存的门店数
+hist_path = os.path.join(OUT, "stock_hist.json")
+if os.path.exists(hist_path):
+    try:
+        h = json.load(open(hist_path, encoding="utf-8"))
+        payload["hist"] = {"days": h.get("days") or [], "bySku": h.get("bySku") or {}, "updated": h.get("updated")}
+        ds = h.get("days") or []
+        if ds:
+            print(f"   在售快照 {len(ds)} 天（{ds[0]} ~ {ds[-1]}）")
+    except Exception as e:
+        print("   ⚠️ stock_hist.json 读取失败:", str(e)[:80])
+
 html = open(os.path.join(OUT, "template_v2.html"), encoding="utf-8").read()
 blob = "const D = " + json.dumps(payload, ensure_ascii=False, separators=(",", ":")) + \
        ";\nwindow.D = D;"

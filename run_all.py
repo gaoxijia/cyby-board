@@ -34,8 +34,24 @@ def run(script):
         sys.exit(1)
 
 
+def run_soft(script):
+    """可选步骤：失败只告警，不中止本轮（用于库存快照这类「有更好、没有也能出板」的增强项）"""
+    print(f"\n===== {script}（可选）=====", flush=True)
+    try:
+        r = subprocess.run([PY, os.path.join(DIR, script)], capture_output=True, text=True, timeout=900)
+    except subprocess.TimeoutExpired:
+        print(f"⚠️ {script} 超时，跳过（不影响出板）", flush=True)
+        return
+    tail = (r.stdout or "").strip().splitlines()[-3:]
+    for line in tail:
+        print(line, flush=True)
+    if r.returncode != 0:
+        print(f"⚠️ {script} 失败但继续：{(r.stderr or r.stdout or '').strip()[-200:]}", flush=True)
+
+
 def main():
     run("fetch_jieshun.py")
+    run_soft("stock_hist.py")          # 逐日库存快照（在售时长），失败则沿用已有历史
     run("fetch_platform.py")
     run("fetch_cat_platform.py")
     run("fetch_erp_periods.py")

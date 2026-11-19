@@ -863,6 +863,8 @@ function movRows(){
     o.amt = o.stock * (o.price||0);
     o.cover = o.dag>0 ? o.stock/o.dag : null;
     o.lv = lvOf(o.s30, o.dag, days);
+    const os = onsaleOf(r.sku, p.range.from, p.range.to);
+    o.onDays = os ? os.days : null; o.onCov = os ? os.covered : 0;
     out.push(o);
   });
   if(ca) ca.m.forEach((x, sku)=>{                            // 立方有销量但街顺缺失的 SKU
@@ -870,8 +872,10 @@ function movRows(){
     const nm = (SK[sku] && SK[sku].name) || CUBE.bySku[sku].name;
     if(catIsEx(nm)) return;
     const dag = x.q/days;
+    const os2 = onsaleOf(sku, p.range.from, p.range.to);
     out.push({sku, name:nm, stock:0, s3:x.t3, s7:x.t7, s14:x.t14, s30:x.q, q3:x.t3,
-              price:0, stores:x.st, amt:0, dag, cover:null, lv:lvOf(x.q, dag, days)});
+              price:0, stores:x.st, amt:0, dag, cover:null, lv:lvOf(x.q, dag, days),
+              onDays: os2 ? os2.days : null, onCov: os2 ? os2.covered : 0});
   });
   return out;
 }
@@ -890,6 +894,31 @@ function movPlatRows(){
 }
 /* 商品动销：无库存且零动销的 SKU 直接剔除，不出现在表内/分布/导出 */
 function movVisible(r){ return (r.stock>0 || r.s30>0); }
+/**
+ * 在售时长：窗口内「有库存（任一门店有货）且店铺营业」的天数。
+ * 数据来自逐日库存快照 D.hist（stock_hist.py 每日累积；库存流水回填 + 当天街顺快照）：
+ *   hist.days = ["2026-11-12", ...]，hist.bySku[sku][i] = 该天有库存的门店数（0=全断货）
+ * 返回 {days, covered}：covered = 快照已覆盖的窗口天数（不足 30 时按覆盖天数算率）
+ */
+function onsaleOf(sku, from, to){
+  const H = D.hist;
+  if(!H || !H.days || !H.days.length) return null;
+  const arr = H.bySku ? H.bySku[sku] : null;
+  let cov = 0, on = 0;
+  for(let i=0;i<H.days.length;i++){
+    const d = H.days[i];
+    if(d < from || d > to) continue;
+    cov++;
+    if(arr && (arr[i]||0) > 0) on++;
+  }
+  return cov ? {days:on, covered:cov} : null;
+}
+function onsaleTip(){
+  const H = D.hist;
+  return H && H.days && H.days.length
+    ? `逐日库存快照（覆盖 ${H.days[0]} ~ ${H.days[H.days.length-1]}）：在售 = 当天该商品在任一门店有库存、且店铺营业`
+    : "暂无逐日库存快照，无法计算在售时长";
+}
 /** 取单品逐日销量/销售额（日立方，按当前平台与门店筛选） */
 function skuDaily(sku, from, to, plat){
   if(!CUBE || !CUBE.bySku[sku]) return [];
@@ -953,7 +982,9 @@ function renderMovTable(){
   // 动态表头
   $("#movThead").innerHTML = isAll
     ? `<th>SKU / 商品</th><th class="r">近3天</th><th class="r">近7天</th><th class="r">近14天</th><th class="r">区间销量</th>
-       <th class="r">日均</th><th class="r">库存</th><th class="r">可售天数</th><th>等级</th><th class="r">动销门店数</th><th class="r">近14天趋势</th>`
+       <th class="r">日均</th><th class="r">库存</th><th class="r">可售天数</th>
+       <th class="r" title="${onsaleTip().replace(/"/g,'&quot;')}">30天在售时长</th>
+       <th>等级</th><th class="r">动销门店数</th><th class="r">近14天趋势</th>`
     : `<th>SKU / 商品</th><th class="r">区间销量</th><th class="r">日均</th><th class="r">销售额(元)</th><th class="r">动销门店数</th>`;
   if(!isAll){
     const rows = (movPlatRows()||[])
@@ -983,6 +1014,8 @@ function renderMovTable(){
   $("#movTable tbody").innerHTML = show.length ? show.map(r=>{
     const L = LV[r.lv];
     const daily = skuDaily(r.sku, p.range.from, p.range.to, "全部").slice(-14);
+    const onRate = (r.onCov && r.onDays!=null) ? r.onDays/r.onCov*100 : null;
+    const onCol = onRate==null ? "var(--muted)" : onRate<50 ? "var(--red)" : onRate<80 ? "var(--orange)" : "var(--text)";
     return `<tr style="cursor:pointer" onclick="showSkuTrend('${r.sku}')" title="点击查看该商品销售趋势">
       <td class="sku-name" title="${r.name}">${r.name}<div class="muted" style="font-size:10.5px">${r.sku}</div></td>
       <td class="r num">${fmt(r.q3)}</td><td class="r num">${fmt(r.s7)}</td><td class="r num">${fmt(r.s14)}</td>
@@ -990,11 +1023,17 @@ function renderMovTable(){
       <td class="r num">${r.dag.toFixed(1)}</td>
       <td class="r num">${fmt(r.stock)}</td>
       <td class="r num" style="color:${r.cover==null?"var(--muted)":r.cover<7?"var(--red)":r.cover<=F.slow?"var(--text)":"var(--orange)"}">${r.cover==null?"—":r.cover.toFixed(0)}</td>
+      <td class="r num" style="color:${onCol};white-space:nowrap">${r.onDays==null?"—":`${r.onDays}/${r.onCov} 天`}
+        <div class="muted" style="font-size:10px;line-height:1.1">${onRate==null?"":onRate.toFixed(0)+"%"}</div></td>
       <td><span class="pill ${L.c}">${L.t}</span></td>
       <td class="r num">${r.stores}</td>
       <td class="r">${sparkline(daily)}</td></tr>`;
-  }).join("") : `<tr><td colspan="11" class="empty">没有符合条件的数据</td></tr>`;
-  $("#movFoot").innerHTML = `共 <b>${fmt(rows.length)}</b> 个 SKU${hidden?`（已隐藏 ${fmt(hidden)} 个无库存且零动销）`:""}${rows.length>300?"，显示前 300 条（按区间销量排序），导出 CSV 可拿全量":""}。<b>点击任意行查看该商品的逐日销售趋势</b>；已剔除赠品/包装袋，销量为所选时间段（区间末尾倒推），库存为实时快照。`;
+  }).join("") : `<tr><td colspan="12" class="empty">没有符合条件的数据</td></tr>`;
+  const covN = (rows[0] && rows[0].onCov) || 0;
+  $("#movFoot").innerHTML = `共 <b>${fmt(rows.length)}</b> 个 SKU${hidden?`（已隐藏 ${fmt(hidden)} 个无库存且零动销）`:""}${rows.length>300?"，显示前 300 条（按区间销量排序），导出 CSV 可拿全量":""}。<b>点击任意行查看该商品的逐日销售趋势</b>；已剔除赠品/包装袋，销量为所选时间段（区间末尾倒推），库存为实时快照。`
+    + `<br><b>在售时长口径：</b>当天该商品在任一门店有库存、且店铺营业即算「在售」（店铺营业但商品无库存＝不在售）。`
+    + (covN ? `逐日库存快照目前覆盖 <b>${covN}</b> 天，先按「在售天数/${covN} 天」给率；快照每日累积，满 ${p.range.days} 天后即为完整 ${p.range.days} 天口径。`
+           : `暂无可用的逐日库存快照，在售时长显示为「—」。`);
 }
 
 /* ---------- 库存周转 ---------- */
@@ -1447,12 +1486,12 @@ function exportCSV(kind){
   } else if(kind==="mov"){
     const p = curP(), lvF = $("#movLevel").value, kw = ($("#movSearch").value||"").toLowerCase();
     if(movPlat==="全部"){
-      header = ["SKU","商品名称","近3天","近7天","近14天",`区间销量(${p.range.days}天)`,"日均","库存","可售天数","等级","动销门店数","零售价"];
+      header = ["SKU","商品名称","近3天","近7天","近14天",`区间销量(${p.range.days}天)`,"日均","库存","可售天数","在售天数","在售天数率(%)","等级","动销门店数","零售价"];
       rows = movRows().filter(movVisible).filter(r=>!lvF||r.lv===lvF)
         .filter(r=>!kw||r.name.toLowerCase().includes(kw)||r.sku.toLowerCase().includes(kw))
         .sort((a,b)=>b.s30-a.s30)
         .map(r=>[r.sku,r.name,r.q3,r.s7,r.s14,r.s30,(r.dag||0).toFixed(2),r.stock,
-          r.cover==null?"":r.cover.toFixed(1),r.lv,r.stores,r.price]);
+          r.cover==null?"":r.cover.toFixed(1),r.onDays==null?"":r.onDays,r.onCov&&r.onDays!=null?(r.onDays/r.onCov*100).toFixed(0):"",r.lv,r.stores,r.price]);
     }else{
       header = ["平台","SKU","商品名称",`区间销量(${p.range.days}天)`,"日均","销售额(元)","动销门店数"];
       rows = (movPlatRows()||[])
