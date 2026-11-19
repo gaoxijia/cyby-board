@@ -61,3 +61,5 @@ jobs:
 
       - name: 部署 Pages
         uses: actions/deploy-pages@v4
+
+# 手动触发重试 2026-11-19 晚（重跑一次采集，定位是否接口临时故障）
