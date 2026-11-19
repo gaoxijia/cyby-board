@@ -82,17 +82,49 @@ def query_store_channel(f, t, channel):
     return out
 
 
+# 上次快照兜底：ERP BI 偶发 500（2026-11-19 channel 接口连续 500 导致云端构建整轮失败），
+# 渠道×门店数据拿不到时沿用上次快照，不让整轮不发布。
+# 快照来源优先仓库内的 erp_store_channel.json；没有的话从当前线上页面的 payload 里提取 storeCh。
+PREV_PATH = os.path.join(OUT_DIR, "erp_store_channel.json")
+prev_periods = {}
+if os.path.exists(PREV_PATH):
+    try:
+        prev_periods = json.load(open(PREV_PATH, encoding="utf-8")).get("periods") or {}
+    except Exception:
+        prev_periods = {}
+if not prev_periods:
+    try:
+        LIVE = "https://gaoxijia.github.io/cyby-board/index.html"
+        req = urllib.request.Request(LIVE, headers={"User-Agent": "Mozilla/5.0"}, method="GET")
+        with urllib.request.urlopen(req, timeout=60) as r:
+            html = r.read().decode("utf-8", "ignore")
+        marker = "const D = "
+        i = html.find(marker)
+        if i >= 0:
+            payload, _ = json.JSONDecoder().raw_decode(html[i + len(marker):])
+            prev_periods = payload.get("storeCh") or {}
+            print(f"⚠️ 渠道兜底快照来自当前线上页面（{len(prev_periods)} 个周期）")
+    except Exception as e:
+        print(f"⚠️ 无法读取线上兜底快照: {str(e)[:100]}")
+
 periods = {}
 for key, (label, days) in PERIODS.items():
     f = (date(TODAY.year, TODAY.month, 1) if days is None else END - timedelta(days=days - 1)).isoformat()
     t = END.isoformat()
-    ch = {}
-    for c in CHANNELS:
-        ch[c] = query_store_channel(f, t, c)
-        tot_g = sum(v["gmv"] for v in ch[c].values())
-        tot_o = sum(v["orders"] for v in ch[c].values())
-        print(f"{label} {f}~{t} · {c}: {len(ch[c])} 店 · GMV {tot_g:,.0f} · 订单 {tot_o}")
-    periods[key] = {"label": label, "range": {"from": f, "to": t}, "channels": ch}
+    try:
+        ch = {}
+        for c in CHANNELS:
+            ch[c] = query_store_channel(f, t, c)
+            tot_g = sum(v["gmv"] for v in ch[c].values())
+            tot_o = sum(v["orders"] for v in ch[c].values())
+            print(f"{label} {f}~{t} · {c}: {len(ch[c])} 店 · GMV {tot_g:,.0f} · 订单 {tot_o}")
+        periods[key] = {"label": label, "range": {"from": f, "to": t}, "channels": ch}
+    except Exception as e:
+        old = prev_periods.get(key)
+        if not old or not (old.get("channels") or {}):
+            raise
+        print(f"⚠️ {label} 渠道接口不可用（{str(e)[:80]}），沿用上次快照（{old.get('range',{}).get('from')}~{old.get('range',{}).get('to')}）")
+        periods[key] = {"label": label, "range": old.get("range") or {"from": f, "to": t}, "channels": old["channels"]}
 
 path = os.path.join(OUT_DIR, "erp_store_channel.json")
 json.dump({"generated_at": TODAY.isoformat(), "periods": periods},
