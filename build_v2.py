@@ -119,10 +119,11 @@ for key, p in ep.items():
         "label": p["label"], "range": p["range"], "summary": p["summary"],
         "trend": p.get("trend") or [], "heatmap": p.get("heatmap") or [],
         "charts": p.get("charts") or {},
-        "storeSales": [{"name": r["dimension_name"],
-                        "gmv": (r.get("current") or {}).get("gmv") or 0,
-                        "orders": (r.get("current") or {}).get("order_count") or 0,
-                        "qty": (r.get("current") or {}).get("sales_quantity") or 0}
+        # 兼容两种行格式：BI 原始（dimension_name/current.gmv）与 兜底快照回填的已构建格式（name/gmv）
+        "storeSales": [{"name": r.get("dimension_name") or r.get("name") or "未知门店",
+                        "gmv": (r.get("current") or {}).get("gmv") or r.get("gmv") or 0,
+                        "orders": (r.get("current") or {}).get("order_count") or r.get("orders") or 0,
+                        "qty": (r.get("current") or {}).get("sales_quantity") or r.get("qty") or 0}
                        for r in p.get("storeSales") or []],
     }
 
