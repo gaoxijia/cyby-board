@@ -237,7 +237,6 @@ body.locked > .wrap{display:none}
       <h2>SKU 动销明细 <span class="tip">可售天数 = 库存 ÷ 街顺日均销量</span></h2>
       <div style="display:flex;gap:8px">
         <select id="movLevel"><option value="">全部等级</option><option value="A">A · 热销</option><option value="B">B · 常销</option><option value="C">C · 慢销</option><option value="D">D · 零动销</option></select>
-        <label style="font-size:12px;color:var(--muted);display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="movHideEmpty" checked> 隐藏无库存且零动销</label>
         <input type="text" id="movSearch" placeholder="搜索 SKU / 商品">
         <button class="exp" data-exp="mov">导出当前筛选</button>
       </div>
@@ -498,7 +497,6 @@ function initFilters(){
   });
   $("#movSearch").oninput = renderMovTable;
   $("#movLevel").onchange = renderMovTable;
-  $("#movHideEmpty").onchange = ()=>{ renderMovDist(); renderMovTable(); };
   $("#rstSearch").oninput = renderRestockTable;
   $("#rstLevel").onchange = renderRestockTable;
   $("#cwProv").onchange = renderCwhub;
@@ -675,11 +673,18 @@ function renderKpis(){
       if(v.state==="死库存") deadCnt++;
     });
   });
+  // SKU 级（跨门店汇总，剔除赠品/包装袋）：所选区间的动销率与滞销率
+  const mr = movRows();
+  const skuTotal = mr.length, skuSold = mr.filter(r=>r.s30>0).length;
+  const skuStock = mr.filter(r=>r.stock>0).length, skuSlow = mr.filter(r=>r.stock>0 && r.s30<=0).length;
+  const sellRate = skuTotal ? skuSold/skuTotal*100 : 0;
+  const slowRate = skuStock ? skuSlow/skuStock*100 : 0;
   const cards = [
     {lab:"订单销售额", val:money(gmv), foot:`${p.range.from} ~ ${p.range.to}（${p.range.days}天）`, cls:""},
     {lab:"有效订单数", val:fmt(orders), foot:`客单价 ${orders?money(gmv/orders):"—"}`, cls:""},
     {lab:"销售件数", val:fmt(qty), foot:`店日均销 ${money(withSalesStores?gmv/p.range.days/withSalesStores:0)}`, cls:""},
-    {lab:"SKU 动销率", val:a.rate.toFixed(1)+"%", foot:`${fmt(a.skuSell)} / ${fmt(a.skuN)} 个店-SKU 有销量`, cls:"blue"},
+    {lab:`${p.range.days}天动销率`, val:sellRate.toFixed(1)+"%", foot:`${fmt(skuSold)} / ${fmt(skuTotal)} 个 SKU 有销量`, cls:"blue"},
+    {lab:`${p.range.days}天滞销率`, val:slowRate.toFixed(1)+"%", foot:`${fmt(skuSlow)} / ${fmt(skuStock)} 个有库存 SKU 零销量`, cls:slowRate>=50?"red":"orange"},
     {lab:"整体可售天数", val:a.cover==null?"—":a.cover.toFixed(0)+" 天", foot:`库存 ${fmt(a.stock)} 件 · 日均 ${a.dag.toFixed(1)}`, cls:(a.cover!=null&&a.cover>90)?"red":""},
     {lab:"需补货", val:`${fmt(need)} 件`, foot:`${fmt(needCnt)} 个店-SKU · 紧急 ${fmt(urgent)}`, cls:urgent>0?"red":"green"},
     {lab:"压货库存", val:`${fmt(over)} 件`, foot:`${fmt(overCnt)} 组合可售>${F.slow}天 · 死库存 ${fmt(deadCnt)}`, cls:over>0?"orange":""},
@@ -883,9 +888,8 @@ function movPlatRows(){
   });
   return rows;
 }
-/* 商品动销：过滤 + 单品销售趋势 */
-function movHideEmpty(){ const el=$("#movHideEmpty"); return !el || el.checked; }
-function movVisible(r){ return !movHideEmpty() || (r.stock>0 || r.s30>0); }
+/* 商品动销：无库存且零动销的 SKU 直接剔除，不出现在表内/分布/导出 */
+function movVisible(r){ return (r.stock>0 || r.s30>0); }
 /** 取单品逐日销量/销售额（日立方，按当前平台与门店筛选） */
 function skuDaily(sku, from, to, plat){
   if(!CUBE || !CUBE.bySku[sku]) return [];
@@ -969,7 +973,7 @@ function renderMovTable(){
     return;
   }
   const allRows = movRows();
-  const hidden = movHideEmpty() ? allRows.filter(r=>!movVisible(r)).length : 0;
+  const hidden = allRows.filter(r=>!movVisible(r)).length;   // 无库存且零动销，直接剔除
   const rows = allRows
     .filter(movVisible)
     .filter(r=>!lvF||r.lv===lvF)
