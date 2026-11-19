@@ -53,14 +53,18 @@ async function attach(matchFn) {
     if (r.result && r.result.exceptionDetails) throw new Error('EVAL: ' + JSON.stringify(r.result.exceptionDetails).slice(0, 200));
     return r.result && r.result.result ? r.result.result.value : null;
   };
-  return {ws, ev};
+  return {ws, ev, send};
 }
 
 const r2 = n => Math.round(n * 100) / 100;
 
 /* ---------------- 美团：分段拉日明细，再按周期聚合（接口上限 61 天） ---------------- */
 async function fetchMeituan() {
-  const {ws, ev} = await attach(u => u.indexOf('ka.waimai.meituan.com') >= 0);
+  const {ws, ev, send} = await attach(u => u.indexOf('https://ka.waimai.meituan.com/') === 0);
+  // 先刷新页面：后台 tab 挂久后 fetch 包装器会异常（返回 TypeError / r.text 不存在），刷新即恢复
+  await send('Page.enable');
+  await send('Page.reload', {ignoreCache: true});
+  await new Promise(r => setTimeout(r, 12000));
   const start = new Date(PERIODS.p90.from), stop = new Date(PERIODS.p90.to);
   let rows = [];
   for (let cur = start; cur <= stop;) {
@@ -137,7 +141,8 @@ async function fetchEleme() {
     return r.result && r.result.result ? r.result.result.value : null;
   };
   await send('Runtime.enable'); await send('Page.enable');
-  await send('Page.navigate', {url: 'https://nr.ele.me/app/eleme-nr-bfe-newretail/common-next#/pc/promotionDataPc/'});
+  // 同样先整页刷新，清掉旧的执行上下文/会话缓存
+  await send('Page.reload', {ignoreCache: true});
 
   // 等 iframe 上下文就绪
   let cid = null;
