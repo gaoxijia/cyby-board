@@ -140,9 +140,16 @@ body.locked > .wrap{display:none}
   </div>
 </div>
 <div class="wrap">
-<header>
-  <h1>出其不意经营看板<span class="badge" id="srcBadge">街顺 API · 实时库存</span></h1>
-  <div class="sub" id="subTitle"></div>
+<header style="display:flex;justify-content:space-between;gap:12px">
+  <div>
+    <h1>出其不意经营看板<span class="badge" id="srcBadge">街顺 API · 实时库存</span></h1>
+    <div class="sub" id="subTitle"></div>
+  </div>
+  <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;padding-top:6px">
+    <span class="muted" id="freshTip" style="font-size:11.5px"></span>
+    <button class="chip" id="btnRefresh" title="触发云端重新采集并建板（约 6-10 分钟），完成后自动刷新页面">
+      <span id="btnRefreshTxt">↻ 刷新数据</span></button>
+  </div>
 </header>
 
 <div class="periods">
@@ -1666,6 +1673,103 @@ function renderAll(){
   const p = curP();
   $("#subTitle").textContent = `数据区间 ${p.range.from} ~ ${p.range.to}（${p.range.days} ${CP?"天":"个完整日"}） · ${M.stores.length} 家门店 · 库存/销量为街顺实时快照（采集于 ${M.jsDate}）`;
 }
+/* ---- 右上角手动刷新（触发云端重新采集） ---- */
+const GH_REPO = "gaoxijia/cyby-board", GH_WF = "board.yml", GH_KEY = "cyby_gh_pat_v1";
+const R = s => document.querySelector(s);
+function ghToken(){ return (localStorage.getItem(GH_KEY) || "").trim(); }
+function ghApi(path, opt){
+  const tok = ghToken();
+  return fetch("https://api.github.com" + path, Object.assign({
+    headers: Object.assign({Accept: "application/vnd.github+json"},
+      tok ? {Authorization: "Bearer " + tok} : {})
+  }, opt || {}));
+}
+function setRefreshBtn(txt, disabled){
+  const b = R("#btnRefresh"); b.disabled = !!disabled;
+  b.style.opacity = disabled ? ".6" : "1";
+  R("#btnRefreshTxt").textContent = txt;
+}
+function setFreshTip(html){ R("#freshTip").innerHTML = html; }
+function renderFreshTip(){
+  const t = (M.jsDate || "").replace("T", " ");
+  const d = new Date(t.replace(" ", "T") + "+08:00");
+  const ageH = isNaN(d.getTime()) ? null : (Date.now() - d.getTime()) / 3600000;
+  if(ageH === null){ setFreshTip(""); return; }
+  const stale = ageH > 26;
+  setFreshTip((stale ? '<b style="color:var(--red,#c0392b)">数据偏旧</b> · ' : "") + "采集于 " + t);
+}
+async function latestDispatchRun(){
+  const r = await ghApi("/repos/" + GH_REPO + "/actions/runs?event=workflow_dispatch&per_page=3");
+  if(!r.ok) return null;
+  const d = await r.json();
+  return ((d.workflow_runs || [])[0]) || null;
+}
+async function watchRefresh(sinceTs){
+  const deadline = Date.now() + 15 * 60000;
+  while(Date.now() < deadline){
+    await new Promise(r => setTimeout(r, 30000));
+    const run = await latestDispatchRun();
+    if(run && new Date(run.created_at).getTime() >= sinceTs - 30000){
+      if(run.status === "completed"){
+        if(run.conclusion === "success"){
+          setFreshTip("✅ 云端刷新完成，正在更新页面…");
+          location.reload();
+        } else {
+          alert("云端刷新失败（" + run.conclusion + "），线上仍为上一版数据。可到 GitHub Actions 页查看日志。");
+          setRefreshBtn("↻ 刷新数据", false);
+        }
+        return;
+      }
+      setFreshTip("⏳ 云端采集中（约 6-10 分钟）…");
+    }
+  }
+  setRefreshBtn("↻ 刷新数据", false);
+  setFreshTip("等待云端构建超时，可稍后手动刷新页面查看");
+}
+async function dispatchRefresh(){
+  const b = R("#btnRefresh");
+  if(b.disabled) return;
+  let tok = ghToken();
+  if(!tok){
+    const inp = prompt("首次使用：请粘贴 GitHub token（一次即可，之后自动记忆）。\n创建方法：GitHub → Settings → Developer settings → Fine-grained tokens → 仅选 gaoxijia/cyby-board 仓库 → Repository permissions 勾选 Actions: Read and write。\ntoken 只保存在本浏览器，不会上传。");
+    if(!inp) return;
+    tok = inp.trim();
+    if(!tok) return;
+    localStorage.setItem(GH_KEY, tok);
+  }
+  setRefreshBtn("⏳ 触发中…", true);
+  try{
+    const r = await fetch("https://api.github.com/repos/" + GH_REPO + "/actions/workflows/" + GH_WF + "/dispatches",
+      {method: "POST", headers: {Authorization: "Bearer " + tok, Accept: "application/vnd.github+json"},
+       body: JSON.stringify({ref: "main"})});
+    if(r.status === 204){
+      setFreshTip("⏳ 已触发云端采集（约 6-10 分钟），完成后自动刷新…");
+      watchRefresh(Date.now());
+    } else if(r.status === 401 || r.status === 403){
+      localStorage.removeItem(GH_KEY);
+      setRefreshBtn("↻ 刷新数据", false);
+      alert("token 无效或没有 Actions 权限，已清除记忆，请重新点击并粘贴新 token。");
+    } else {
+      setRefreshBtn("↻ 刷新数据", false);
+      alert("触发失败：HTTP " + r.status + "（可能有构建正在进行，稍后再试）");
+    }
+  } catch(e){
+    setRefreshBtn("↻ 刷新数据", false);
+    alert("网络错误：" + e.message);
+  }
+}
+async function initRefresh(){
+  renderFreshTip();
+  R("#btnRefresh").addEventListener("click", dispatchRefresh);
+  // 页面加载时若已有 dispatch 构建在跑，继续跟踪
+  try{
+    const run = await latestDispatchRun();
+    if(run && run.status !== "completed" && Date.now() - new Date(run.created_at).getTime() < 20 * 60000){
+      setRefreshBtn("⏳ 云端构建中…", true);
+      watchRefresh(new Date(run.created_at).getTime());
+    }
+  } catch(e){}
+}
 function boot(){
   if(!window.D){ $("#kpis").innerHTML='<div class="kpi"><div class="lab">未找到数据</div></div>'; return; }
   $("#jsTime").textContent = M.jsDate;
@@ -1673,7 +1777,7 @@ function boot(){
   <b>周转口径：</b>可售天数 = 当前库存 ÷ 日均销量（可在顶部切换「街顺日均」或「近30天销量÷30」）；日均=0 的 SKU 不参与周转、归入死库存。<br>
   <b>剔除口径：</b>赠品 / 打包袋 / 包装袋不计入库存件数、库存金额、周转与补货（本版共剔除 ${M.excluded?fmt(M.excluded.qty)+" 件 / "+money(M.excluded.amt):"—"}）。<br>
   <b>说明：</b>时间段切换影响经营指标（GMV/订单/趋势/渠道），库存与周转为实时快照、不随时间段变化。`;
-  initFilters(); syncPeriodChips(); renderAll();
+  initFilters(); syncPeriodChips(); renderAll(); initRefresh();
 }
 /* ---- 登录门 ---- */
 const AUTH_HASH = "abbc6b79c4a9428a26840dbcea778252a56ca61f8cbd0a36aecc49224d44b9be";
